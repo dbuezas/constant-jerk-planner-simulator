@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c \"import json; json.load\\(open\\(''/Users/davidbuezas/code/constant-jerk-planner/_PLANNER.ipynb''\\)\\); print\\(''ipynb json ok''\\)\")"
+    ]
+  }
+}
