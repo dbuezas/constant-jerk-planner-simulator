@@ -1,7 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python3 -c \"import json; json.load\\(open\\(''/Users/davidbuezas/code/constant-jerk-planner/_PLANNER.ipynb''\\)\\); print\\(''ipynb json ok''\\)\")"
+      "Bash(python3 -c \"import json; json.load\\(open\\(''/Users/davidbuezas/code/constant-jerk-planner/_PLANNER.ipynb''\\)\\); print\\(''ipynb json ok''\\)\")",
+      "Bash(apply_patch \"*** Begin Patch\n*** Update File: /Users/davidbuezas/code/constant-jerk-planner/marlin files/trajectory_constant_jerk.h\n@@\n     for \\(int i = 0; i < 7; ++i\\) {\n       phase_dt[i] = 0.0f;\n       phase_start_time[i] = 0.0f;\n       phase_start_pos[i] = 0.0f;\n       phase_start_v[i] = 0.0f;\n       phase_start_a[i] = 0.0f;\n-      phase_jerk[i] = 0.0f;\n     }\n   }\n@@\n-    phase_jerk[0] =  j;\n-    phase_jerk[1] =  0.0f;\n-    phase_jerk[2] = -j;\n-    phase_jerk[3] =  0.0f;\n-    phase_jerk[4] = -j;\n-    phase_jerk[5] =  0.0f;\n-    phase_jerk[6] =  j;\n-\n     float v = v0;\n     float a = a0;\n     float s = 0.0f;\n     float t = 0.0f;\n \n     for \\(int i = 0; i < 7; ++i\\) {\n+      const float jerk = phaseJerk\\(i\\);\n       phase_start_time[i] = t;\n       phase_start_pos[i] = s;\n       phase_start_v[i] = v;\n       phase_start_a[i] = a;\n-      simulatePhase\\(phase_jerk[i], phase_dt[i], v, a, s\\);\n+      simulatePhase\\(jerk, phase_dt[i], v, a, s\\);\n       t += phase_dt[i];\n     }\n   }\n@@\n   float distanceFromPhaseStart\\(const int phase, const float dt\\) const {\n     const float v = phase_start_v[phase];\n     const float a = phase_start_a[phase];\n-    const float jv = phase_jerk[phase];\n+    const float jv = phaseJerk\\(phase\\);\n     return v * dt + 0.5f * a * dt * dt + \\(1.0f / 6.0f\\) * jv * dt * dt * dt;\n   }\n+\n+  float phaseJerk\\(const int phase\\) const {\n+    switch \\(phase\\) {\n+      case 0: return j;\n+      case 1: return 0.0f;\n+      case 2: return -j;\n+      case 3: return 0.0f;\n+      case 4: return -j;\n+      case 5: return 0.0f;\n+      case 6: return j;\n+      default: return 0.0f;\n+    }\n+  }\n@@\n   float phase_start_time[7] = {};\n   float phase_start_pos[7] = {};\n   float phase_start_v[7] = {};\n   float phase_start_a[7] = {};\n-  float phase_jerk[7] = {};\n };\n*** End Patch\")",
+      "Bash(apply_patch:*)",
+      "Bash(g++ -std=c++17 -O0 -g \"/Users/davidbuezas/code/constant-jerk-planner/propagate_extremal_test.cpp\" -o \"/Users/davidbuezas/code/constant-jerk-planner/propagate_extremal_test\")",
+      "Bash(\"/Users/davidbuezas/code/constant-jerk-planner/propagate_extremal_test\")",
+      "Bash(g++ -std=c++17 -O0 -g \"/Users/davidbuezas/code/constant-jerk-planner/trajectory_constant_jerk_test.cpp\" -o \"/Users/davidbuezas/code/constant-jerk-planner/trajectory_constant_jerk_test\")",
+      "Bash(\"/Users/davidbuezas/code/constant-jerk-planner/trajectory_constant_jerk_test\")",
+      "Bash(/Users/davidbuezas/code/constant-jerk-planner/trajectory_constant_jerk_test)"
     ]
   }
 }
