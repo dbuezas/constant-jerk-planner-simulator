@@ -50,7 +50,7 @@ void run_case(const char *label,
     if (v > v_max) v_max = v;
   }
 
-  std::printf("  v_min=%.6f v_max=%.6f\n", v_min, v_max);
+  std::printf("  v_min=%.6f v_max=%.6f v_nominal=%.6f\n", v_min, v_max, v_nominal);
   if (!approx_ge(v_min, 0.0f))
     std::printf("  FAIL: v_min < 0\n");
   if (!approx_le(v_max, v_nominal))
@@ -70,5 +70,10 @@ int main() {
   run_case("nominal_26", 0.0f, 0.0f, 0.0f, 0.0f, 500.0f, 8000.0f, 35.0f, 26.0f);
   run_case("nominal_62", 0.0f, 0.0f, 0.0f, 0.0f, 500.0f, 8000.0f, 35.0f, 62.0f);
   run_case("nominal_63", 0.0f, 0.0f, 0.0f, 0.0f, 500.0f, 8000.0f, 35.0f, 63.0f);
+
+  for (int v = 1; v <= 100; ++v) {
+    const float v_nom = static_cast<float>(v);
+    run_case("nominal_sweep", 0.0f, 0.0f, 0.0f, 0.0f, 500.0f, 8000.0f, 200.0f, v_nom);
+  }
   return 0;
 }

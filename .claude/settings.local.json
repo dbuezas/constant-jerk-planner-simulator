@@ -8,7 +8,9 @@
       "Bash(\"/Users/davidbuezas/code/constant-jerk-planner/propagate_extremal_test\")",
       "Bash(g++ -std=c++17 -O0 -g \"/Users/davidbuezas/code/constant-jerk-planner/trajectory_constant_jerk_test.cpp\" -o \"/Users/davidbuezas/code/constant-jerk-planner/trajectory_constant_jerk_test\")",
       "Bash(\"/Users/davidbuezas/code/constant-jerk-planner/trajectory_constant_jerk_test\")",
-      "Bash(/Users/davidbuezas/code/constant-jerk-planner/trajectory_constant_jerk_test)"
+      "Bash(/Users/davidbuezas/code/constant-jerk-planner/trajectory_constant_jerk_test)",
+      "Bash(./trajectory_constant_jerk_test)",
+      "Bash(g++ -O2 -std=c++17 \"/Users/davidbuezas/code/constant-jerk-planner/trajectory_constant_jerk_test.cpp\" -o \"/Users/davidbuezas/code/constant-jerk-planner/trajectory_constant_jerk_test\")"
     ]
   }
 }

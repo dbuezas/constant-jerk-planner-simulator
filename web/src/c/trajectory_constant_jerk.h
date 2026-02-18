@@ -47,6 +47,23 @@ public:
       return v_temp;
     };
 
+    auto compute_v_after3_with_hold = [&](const float a_up, const float v_peak) {
+      float v_temp = v0;
+      float a_temp = a0;
+      float s_temp = 0.0f;
+      const float t1_local = fmaxf(0.0f, (a_up - a0) / j);
+      const float t3_local = fmaxf(0.0f, a_up / j);
+      simulatePhase(j, t1_local, v_temp, a_temp, s_temp);
+      const float v_after3_no_hold = v_temp;
+      float t2_local = 0.0f;
+      if (v_peak > v_after3_no_hold + v_eps && a_up > 0.0f) {
+        t2_local = (v_peak - v_after3_no_hold) / a_up;
+      }
+      simulatePhase(0.0f, t2_local, v_temp, a_temp, s_temp);
+      simulatePhase(-j, t3_local, v_temp, a_temp, s_temp);
+      return v_temp;
+    };
+
     auto compute_profile = [&](const float v_peak, const float a_up, const float a_dn, const bool allow_holds,
                                float &out_s_no_cruise, float &out_v_after3) {
       const float t1_local = fmaxf(0.0f, (a_up - a0) / j);
@@ -106,7 +123,7 @@ public:
       out_s_no_cruise = s_temp;
     };
 
-    const float v_limit_eps = 1e-6f;
+    const float v_limit_eps = 1e-3f;
 
     auto phase_extrema_ok = [&](const float v_start, const float a_start, const float jerk, const float dt) {
       float v_min = v_start;
@@ -134,7 +151,7 @@ public:
       if (a_up_lo > a_up_hi || a_dn_lo > a_dn_hi) return false;
 
       const float v_after3_lo = compute_v_after3_no_hold(a_up_lo);
-      const float v_after3_hi = compute_v_after3_no_hold(a_up_hi);
+      const float v_after3_hi = compute_v_after3_with_hold(a_up_hi, v_peak);
 
       if (v_peak + v_eps < v_after3_lo) return false;
 
@@ -161,13 +178,12 @@ public:
       const float t1_local = fmaxf(0.0f, (a_up_out - a0) / j);
       const float t3_local = fmaxf(0.0f, a_up_out / j);
       simulatePhase(j, t1_local, v_temp, a_temp, s_temp);
-      simulatePhase(-j, t3_local, v_temp, a_temp, s_temp);
-      const float v_after3_no_hold = v_temp;
+      const float v_after3_with_hold = compute_v_after3_with_hold(a_up_out, v_peak);
 
       auto v_after7_no_hold = [&](const float a_dn) {
         const float t5_local = fmaxf(0.0f, (-a_dn) / j);
         const float t7_local = fmaxf(0.0f, (a1 - a_dn) / j);
-        float v_local = v_after3_no_hold;
+        float v_local = v_after3_with_hold;
         float a_local = 0.0f;
         float s_local = 0.0f;
         simulatePhase(-j, t5_local, v_local, a_local, s_local);
@@ -175,14 +191,14 @@ public:
         return v_local;
       };
 
-      float best_dn = a_dn_lo;
+      float best_dn = a_dn_hi;
       for (int iter = 0; iter < 32; ++iter) {
         const float a_mid = 0.5f * (a_dn_lo + a_dn_hi);
         const float v_end = v_after7_no_hold(a_mid);
-        if (v_end > v1) {
-          a_dn_hi = a_mid;
-        } else {
+        if (v_end < v1) {
           a_dn_lo = a_mid;
+        } else {
+          a_dn_hi = a_mid;
           best_dn = a_mid;
         }
       }
@@ -224,16 +240,16 @@ public:
     float a_up = fmaxf(0.0f, a0);
     float a_dn = fminf(0.0f, a1);
 
-    // Fast path: try full accel/decel at nominal when feasible.
+    // Fast path: if nominal is reachable with cruise, lock v_peak = v_nominal.
     {
-      a_up = a_max;
-      a_dn = -a_max;
-      compute_profile(v_nominal, a_up, a_dn, true, s_no_cruise, v_after3);
-      if (validate_profile() && s_no_cruise <= distance && v_after3 > v_eps) {
-        t4 = (distance - s_no_cruise) / v_after3;
-        total_duration = t1 + t2 + t3 + t4 + t5 + t6 + t7;
-        buildPhaseCache();
-        return;
+      if (solve_accel_plateau(v_nominal, a_up, a_dn)) {
+        compute_profile(v_nominal, a_up, a_dn, true, s_no_cruise, v_after3);
+        if (validate_profile() && s_no_cruise <= distance && v_after3 > v_eps) {
+          t4 = (distance - s_no_cruise) / v_after3;
+          total_duration = t1 + t2 + t3 + t4 + t5 + t6 + t7;
+          buildPhaseCache();
+          return;
+        }
       }
     }
 
@@ -244,8 +260,13 @@ public:
         continue;
       }
       compute_profile(v_mid, a_up, a_dn, true, s_no_cruise, v_after3);
-      const bool valid = validate_profile() && distance_feasible(v_after3, s_no_cruise);
-      if (!valid || s_no_cruise > distance) {
+      const bool profile_ok = validate_profile();
+      const bool distance_ok = distance_feasible(v_after3, s_no_cruise);
+      if (!profile_ok) {
+        v_peak_hi = v_mid;
+      } else if (!distance_ok) {
+        v_peak_lo = v_mid;
+      } else if (s_no_cruise > distance) {
         v_peak_hi = v_mid;
       } else {
         v_peak_lo = v_mid;
