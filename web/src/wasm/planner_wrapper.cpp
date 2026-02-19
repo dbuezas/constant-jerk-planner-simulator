@@ -77,3 +77,31 @@ float cjp_traj_acceleration(float t) {
 float cjp_traj_jerk(float t) {
   return g_traj.getJerkAtTime(t);
 }
+
+int cjp_plan_block_trajectory(int index) {
+  CJP_BlockOut block;
+  if (!cjp_get_block((size_t)index, &block)) return 0;
+
+  g_traj.plan(block.entry_v, block.entry_a,
+              block.exit_v, block.exit_a,
+              block.a_max, block.j_max,
+              block.millimeters, block.nominal);
+
+  return g_traj.getTotalDuration() > 0.0f ? 1 : 0;
+}
+
+int cjp_get_block_data(int index, float *out9) {
+  if (!out9) return 0;
+  CJP_BlockOut block;
+  if (!cjp_get_block((size_t)index, &block)) return 0;
+  out9[0] = block.millimeters;
+  out9[1] = block.max_entry_speed;
+  out9[2] = block.nominal;
+  out9[3] = block.a_max;
+  out9[4] = block.j_max;
+  out9[5] = block.entry_v;
+  out9[6] = block.entry_a;
+  out9[7] = block.exit_v;
+  out9[8] = block.exit_a;
+  return 1;
+}

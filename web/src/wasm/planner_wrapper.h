@@ -18,6 +18,9 @@ float cjp_traj_jerk(float t);
 float cjp_traj_plan_time_us(void);
 const char *cjp_traj_status(void);
 
+int cjp_plan_block_trajectory(int index);
+int cjp_get_block_data(int index, float *out9);
+
 #ifdef __cplusplus
 }
 #endif

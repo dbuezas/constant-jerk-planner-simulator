@@ -2,8 +2,11 @@ import Plotly from "plotly.js-dist-min";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
+  type BlockDefinition,
+  type MultiBlockResult,
   type TrajectorySample,
   planAndSample,
+  planMultiBlock,
 } from "./wasm/planner_wasm_loader";
 
 const DEFAULTS = {
@@ -49,10 +52,47 @@ type PlanState = {
 };
 
 function format(value: number, digits = 3) {
-  return Number.isFinite(value) ? value.toFixed(digits) : "—";
+  return Number.isFinite(value) ? value.toFixed(digits) : "\u2014";
 }
 
-function App() {
+const PLOT_THEME = {
+  paper_bgcolor: "#141414",
+  plot_bgcolor: "#141414",
+  font: { color: "#e6e6e6" },
+};
+
+const DEFAULT_BLOCKS_JSON = JSON.stringify(
+  [
+    {
+      millimeters: 5,
+      maxEntrySpeed: 10,
+      nominal: 200,
+      aMax: 5000,
+      jMax: 30000,
+    },
+    {
+      millimeters: 5,
+      maxEntrySpeed: 10,
+      nominal: 200,
+      aMax: 5000,
+      jMax: 30000,
+    },
+    {
+      millimeters: 5,
+      maxEntrySpeed: 10,
+      nominal: 200,
+      aMax: 5000,
+      jMax: 30000,
+    },
+  ],
+
+  null,
+  2
+);
+
+// --- Single Block View ---
+
+function SingleBlockView() {
   const [inputs, setInputs] = useState<InputState>(DEFAULTS);
   const [planState, setPlanState] = useState<PlanState>({
     sample: null,
@@ -134,13 +174,11 @@ function App() {
       xaxis4: { matches: "x", showticklabels: true, title: "time (s)" },
       yaxis: { title: "position (mm)" },
       yaxis2: { title: "velocity (mm/s)", rangemode: "tozero" },
-      yaxis3: { title: "acceleration (mm/s²)" },
-      yaxis4: { title: "jerk (mm/s³)" },
+      yaxis3: { title: "acceleration (mm/s\u00b2)" },
+      yaxis4: { title: "jerk (mm/s\u00b3)" },
       height: plotHeight,
       showlegend: true,
-      paper_bgcolor: "#141414",
-      plot_bgcolor: "#141414",
-      font: { color: "#e6e6e6" },
+      ...PLOT_THEME,
       shapes: [
         {
           type: "line",
@@ -249,7 +287,9 @@ function App() {
 
     requestAnimationFrame(tick);
   }, [inputs]);
+
   if (planState.sample?.status !== "OK") console.log({ planState, inputs });
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-6">
       <section className="rounded-xl border border-[#333] bg-[#1d1d1d] px-5 py-4">
@@ -264,7 +304,6 @@ function App() {
               type="number"
               value={inputs.entryV}
               min={0}
-              // max={200}
               step={1}
               onChange={(e) => updateInput("entryV", Number(e.target.value))}
               onKeyDown={(e) => handleShiftStep(e, "entryV")}
@@ -279,8 +318,6 @@ function App() {
               id="entryA"
               type="number"
               value={inputs.entryA}
-              // min={-2000}
-              // max={2000}
               step={10}
               onChange={(e) => updateInput("entryA", Number(e.target.value))}
               onKeyDown={(e) => handleShiftStep(e, "entryA")}
@@ -296,7 +333,6 @@ function App() {
               type="number"
               value={inputs.nominal}
               min={1}
-              // max={200}
               step={1}
               onChange={(e) => updateInput("nominal", Number(e.target.value))}
               onKeyDown={(e) => handleShiftStep(e, "nominal")}
@@ -312,13 +348,11 @@ function App() {
               type="number"
               value={inputs.exitV}
               min={0}
-              // max={200}
               step={1}
               onChange={(e) => updateInput("exitV", Number(e.target.value))}
               onKeyDown={(e) => handleShiftStep(e, "exitV")}
             />
           </div>
-
           <div className="grid gap-1.5 text-left">
             <label className="text-sm text-[#b8b8b8]" htmlFor="exitA">
               Exit acceleration (mm/s²)
@@ -328,8 +362,6 @@ function App() {
               id="exitA"
               type="number"
               value={inputs.exitA}
-              // min={-2000}
-              // max={2000}
               step={10}
               onChange={(e) => updateInput("exitA", Number(e.target.value))}
               onKeyDown={(e) => handleShiftStep(e, "exitA")}
@@ -345,7 +377,6 @@ function App() {
               type="number"
               value={inputs.maxEntry}
               min={0}
-              // max={200}
               step={1}
               onChange={(e) => updateInput("maxEntry", Number(e.target.value))}
               onKeyDown={(e) => handleShiftStep(e, "maxEntry")}
@@ -361,7 +392,6 @@ function App() {
               type="number"
               value={inputs.distance}
               min={0}
-              // max={200}
               step={1}
               onChange={(e) => updateInput("distance", Number(e.target.value))}
               onKeyDown={(e) => handleShiftStep(e, "distance")}
@@ -377,7 +407,6 @@ function App() {
               type="number"
               value={inputs.aMax}
               min={0}
-              // max={20000}
               step={10}
               onChange={(e) => updateInput("aMax", Number(e.target.value))}
               onKeyDown={(e) => handleShiftStep(e, "aMax")}
@@ -393,7 +422,6 @@ function App() {
               type="number"
               value={inputs.jMax}
               min={0}
-              // max={20000}
               step={100}
               onChange={(e) => updateInput("jMax", Number(e.target.value))}
               onKeyDown={(e) => handleShiftStep(e, "jMax")}
@@ -453,6 +481,237 @@ function App() {
       <section className="flex min-h-0 flex-1 flex-col rounded-xl border border-[#333] bg-[#1d1d1d] px-5 py-4">
         <div ref={plotRef} className="min-h-0 flex-1" />
       </section>
+    </div>
+  );
+}
+
+// --- Multi Block View ---
+
+function MultiBlockView() {
+  const [blocksJson, setBlocksJson] = useState(DEFAULT_BLOCKS_JSON);
+  const [result, setResult] = useState<MultiBlockResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [dt] = useState(0.0005);
+  const plotRef = useRef<HTMLDivElement | null>(null);
+
+  const [plotHeight, setPlotHeight] = useState(600);
+
+  useEffect(() => {
+    const el = plotRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      setPlotHeight(entry.contentRect.height);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  async function runMultiBlock() {
+    setError(null);
+    try {
+      const blocks = JSON.parse(blocksJson) as BlockDefinition[];
+      for (const b of blocks) {
+        if (b.millimeters <= 0 || b.nominal <= 0 || b.aMax <= 0 || b.jMax <= 0)
+          throw new Error("All block parameters must be positive");
+        if (b.maxEntrySpeed < 0)
+          throw new Error("maxEntrySpeed must be non-negative");
+      }
+      const res = await planMultiBlock(blocks, dt);
+      setResult(res);
+    } catch (err) {
+      setError((err as Error).message);
+      setResult(null);
+    }
+  }
+
+  useEffect(() => {
+    if (!plotRef.current || !result) return;
+
+    const { times, position, velocity, acceleration, jerk, blockBoundaries } =
+      result.trajectory;
+
+    const shapes = blockBoundaries.map((t) => ({
+      type: "line" as const,
+      x0: t,
+      x1: t,
+      y0: 0,
+      y1: 1,
+      yref: "paper" as const,
+      line: { color: "#555", width: 1, dash: "dot" as const },
+    }));
+
+    const layout = {
+      grid: { rows: 4, columns: 1, pattern: "independent" },
+      xaxis: { showticklabels: true },
+      xaxis2: { matches: "x", showticklabels: true, title: "time (s)" },
+      xaxis3: { matches: "x", showticklabels: true, title: "time (s)" },
+      xaxis4: { matches: "x", showticklabels: true, title: "time (s)" },
+      yaxis: { title: "position (mm)" },
+      yaxis2: { title: "velocity (mm/s)", rangemode: "tozero" },
+      yaxis3: { title: "acceleration (mm/s\u00b2)" },
+      yaxis4: { title: "jerk (mm/s\u00b3)" },
+      height: plotHeight,
+      showlegend: true,
+      ...PLOT_THEME,
+      shapes,
+    };
+
+    const traces = [
+      {
+        x: times,
+        y: position,
+        mode: "lines",
+        line: { width: 2, color: "deepskyblue" },
+        name: "position",
+        xaxis: "x",
+        yaxis: "y",
+      },
+      {
+        x: times,
+        y: velocity,
+        mode: "lines",
+        line: { width: 2, color: "orange" },
+        name: "velocity",
+        xaxis: "x2",
+        yaxis: "y2",
+      },
+      {
+        x: times,
+        y: acceleration,
+        mode: "lines",
+        line: { width: 2, color: "lime" },
+        name: "acceleration",
+        xaxis: "x3",
+        yaxis: "y3",
+      },
+      {
+        x: times,
+        y: jerk,
+        mode: "lines",
+        line: { width: 2, color: "violet" },
+        name: "jerk",
+        xaxis: "x4",
+        yaxis: "y4",
+      },
+    ];
+
+    void Plotly.react(plotRef.current, traces, layout, {
+      displaylogo: false,
+      responsive: true,
+    });
+  }, [result, plotHeight]);
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-6">
+      <section className="rounded-xl border border-[#333] bg-[#1d1d1d] px-5 py-4">
+        <div className="flex gap-4">
+          <div className="flex-1">
+            <label className="mb-1 block text-sm text-[#b8b8b8]">
+              Block definitions (JSON)
+            </label>
+            <textarea
+              className="w-full rounded-md border border-[#333] bg-[#111] px-3 py-2 font-mono text-sm text-white"
+              rows={10}
+              value={blocksJson}
+              onChange={(e) => setBlocksJson(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-col gap-3 pt-6">
+            <button
+              onClick={runMultiBlock}
+              className="rounded-md bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-500"
+            >
+              Plan
+            </button>
+          </div>
+        </div>
+
+        {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
+
+        {result && (
+          <>
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-[#333] text-[#9aa3b2]">
+                    <th className="px-2 py-1">#</th>
+                    <th className="px-2 py-1">mm</th>
+                    <th className="px-2 py-1">Entry V</th>
+                    <th className="px-2 py-1">Exit V</th>
+                    <th className="px-2 py-1">Nominal</th>
+                    <th className="px-2 py-1">Max Entry</th>
+                    <th className="px-2 py-1">a_max</th>
+                    <th className="px-2 py-1">j_max</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.blocks.map((b, i) => (
+                    <tr key={i} className="border-b border-[#222]">
+                      <td className="px-2 py-1 text-[#9aa3b2]">{i}</td>
+                      <td className="px-2 py-1">{b.input.millimeters}</td>
+                      <td className="px-2 py-1 text-orange-300">
+                        {format(b.entryV, 2)}
+                      </td>
+                      <td className="px-2 py-1 text-orange-300">
+                        {format(b.exitV, 2)}
+                      </td>
+                      <td className="px-2 py-1">{b.input.nominal}</td>
+                      <td className="px-2 py-1">{b.input.maxEntrySpeed}</td>
+                      <td className="px-2 py-1">{b.input.aMax}</td>
+                      <td className="px-2 py-1">{b.input.jMax}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-3 flex gap-6 text-sm text-[#b8b8b8]">
+              <span>Total duration: {format(result.totalDuration)} s</span>
+              <span>Total distance: {format(result.totalDistance, 2)} mm</span>
+            </div>
+          </>
+        )}
+      </section>
+
+      <section className="flex min-h-0 flex-1 flex-col rounded-xl border border-[#333] bg-[#1d1d1d] px-5 py-4">
+        <div ref={plotRef} className="min-h-0 flex-1" />
+      </section>
+    </div>
+  );
+}
+
+// --- App ---
+
+type TabId = "single" | "multi";
+
+function App() {
+  const [activeTab, setActiveTab] = useState<TabId>("single");
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
+      <nav className="flex gap-1">
+        <button
+          className={`rounded-t-lg px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === "single"
+              ? "border border-b-0 border-[#333] bg-[#1d1d1d] text-white"
+              : "border border-transparent bg-transparent text-[#888] hover:text-[#bbb]"
+          }`}
+          onClick={() => setActiveTab("single")}
+        >
+          Single Block
+        </button>
+        <button
+          className={`rounded-t-lg px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === "multi"
+              ? "border border-b-0 border-[#333] bg-[#1d1d1d] text-white"
+              : "border border-transparent bg-transparent text-[#888] hover:text-[#bbb]"
+          }`}
+          onClick={() => setActiveTab("multi")}
+        >
+          Multi Block
+        </button>
+      </nav>
+
+      {activeTab === "single" ? <SingleBlockView /> : <MultiBlockView />}
     </div>
   );
 }
