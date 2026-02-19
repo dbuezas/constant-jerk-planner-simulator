@@ -5,6 +5,8 @@ import { planAndSample, type TrajectorySample } from './wasm/planner_wasm_loader
 const DEFAULTS = {
   entryV: 0,
   exitV: 0,
+  entryA: 0,
+  exitA: 0,
   nominal: 100,
   maxEntry: 10,
   distance: 35,
@@ -25,6 +27,8 @@ function lerpInputs(from: InputState, to: InputState, t: number): InputState {
   return {
     entryV: lerp(from.entryV, to.entryV, t),
     exitV: lerp(from.exitV, to.exitV, t),
+    entryA: lerp(from.entryA, to.entryA, t),
+    exitA: lerp(from.exitA, to.exitA, t),
     nominal: lerp(from.nominal, to.nominal, t),
     maxEntry: lerp(from.maxEntry, to.maxEntry, t),
     distance: lerp(from.distance, to.distance, t),
@@ -51,6 +55,24 @@ function App() {
   const displayedInputsRef = useRef<InputState>(DEFAULTS)
   const animGenRef = useRef(0)
 
+  function updateInput(key: keyof InputState, value: number) {
+    setInputs(prev => {
+      const next = { ...prev, [key]: value }
+      if (key === 'entryV' || key === 'exitV') {
+        next.nominal = Math.max(next.nominal, next.entryV, next.exitV)
+      } else if (key === 'nominal') {
+        next.entryV = Math.min(next.entryV, next.nominal)
+        next.exitV = Math.min(next.exitV, next.nominal)
+      } else if (key === 'entryA' || key === 'exitA') {
+        next.aMax = Math.max(next.aMax, Math.abs(next.entryA), Math.abs(next.exitA))
+      } else if (key === 'aMax') {
+        next.entryA = Math.max(-next.aMax, Math.min(next.aMax, next.entryA))
+        next.exitA = Math.max(-next.aMax, Math.min(next.aMax, next.exitA))
+      }
+      return next
+    })
+  }
+
   function handleShiftStep(e: React.KeyboardEvent<HTMLInputElement>, key: keyof InputState) {
     if (!e.shiftKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return
     e.preventDefault()
@@ -59,7 +81,7 @@ function App() {
     const current = Number(el.value)
     const delta = e.key === 'ArrowUp' ? step : -step
     const clamped = Math.min(Number(el.max), Math.max(Number(el.min), current + delta))
-    setInputs(prev => ({ ...prev, [key]: clamped }))
+    updateInput(key, clamped)
   }
 
   const vmax = useMemo(() => {
@@ -151,9 +173,9 @@ function App() {
       const sample = await planAndSample(
         {
           entryV: planInputs.entryV,
-          entryA: 0,
+          entryA: planInputs.entryA,
           exitV: planInputs.exitV,
-          exitA: 0,
+          exitA: planInputs.exitA,
           aMax: planInputs.aMax,
           jMax: planInputs.jMax,
           distance: planInputs.distance,
@@ -206,7 +228,7 @@ function App() {
               min={0}
               max={200}
               step={1}
-              onChange={(event) => setInputs({ ...inputs, entryV: Number(event.target.value) })}
+              onChange={(e) => updateInput('entryV', Number(e.target.value))}
               onKeyDown={(e) => handleShiftStep(e, 'entryV')}
             />
           </div>
@@ -220,8 +242,36 @@ function App() {
               min={0}
               max={200}
               step={1}
-              onChange={(event) => setInputs({ ...inputs, exitV: Number(event.target.value) })}
+              onChange={(e) => updateInput('exitV', Number(e.target.value))}
               onKeyDown={(e) => handleShiftStep(e, 'exitV')}
+            />
+          </div>
+          <div className="grid gap-1.5 text-left">
+            <label className="text-sm text-[#b8b8b8]" htmlFor="entryA">Entry acceleration (mm/s²)</label>
+            <input
+              className="rounded-md border border-[#333] bg-[#111] px-2 py-2 text-white"
+              id="entryA"
+              type="number"
+              value={inputs.entryA}
+              min={-2000}
+              max={2000}
+              step={10}
+              onChange={(e) => updateInput('entryA', Number(e.target.value))}
+              onKeyDown={(e) => handleShiftStep(e, 'entryA')}
+            />
+          </div>
+          <div className="grid gap-1.5 text-left">
+            <label className="text-sm text-[#b8b8b8]" htmlFor="exitA">Exit acceleration (mm/s²)</label>
+            <input
+              className="rounded-md border border-[#333] bg-[#111] px-2 py-2 text-white"
+              id="exitA"
+              type="number"
+              value={inputs.exitA}
+              min={-2000}
+              max={2000}
+              step={10}
+              onChange={(e) => updateInput('exitA', Number(e.target.value))}
+              onKeyDown={(e) => handleShiftStep(e, 'exitA')}
             />
           </div>
           <div className="grid gap-1.5 text-left">
@@ -234,7 +284,7 @@ function App() {
               min={1}
               max={200}
               step={1}
-              onChange={(event) => setInputs({ ...inputs, nominal: Number(event.target.value) })}
+              onChange={(e) => updateInput('nominal', Number(e.target.value))}
               onKeyDown={(e) => handleShiftStep(e, 'nominal')}
             />
           </div>
@@ -248,7 +298,7 @@ function App() {
               min={0}
               max={200}
               step={1}
-              onChange={(event) => setInputs({ ...inputs, maxEntry: Number(event.target.value) })}
+              onChange={(e) => updateInput('maxEntry', Number(e.target.value))}
               onKeyDown={(e) => handleShiftStep(e, 'maxEntry')}
             />
           </div>
@@ -262,7 +312,7 @@ function App() {
               min={0}
               max={200}
               step={1}
-              onChange={(event) => setInputs({ ...inputs, distance: Number(event.target.value) })}
+              onChange={(e) => updateInput('distance', Number(e.target.value))}
               onKeyDown={(e) => handleShiftStep(e, 'distance')}
             />
           </div>
@@ -274,9 +324,9 @@ function App() {
               type="number"
               value={inputs.aMax}
               min={0}
-              max={2000}
-              step={1}
-              onChange={(event) => setInputs({ ...inputs, aMax: Number(event.target.value) })}
+              max={20000}
+              step={10}
+              onChange={(e) => updateInput('aMax', Number(e.target.value))}
               onKeyDown={(e) => handleShiftStep(e, 'aMax')}
             />
           </div>
@@ -290,7 +340,7 @@ function App() {
               min={0}
               max={20000}
               step={100}
-              onChange={(event) => setInputs({ ...inputs, jMax: Number(event.target.value) })}
+              onChange={(e) => updateInput('jMax', Number(e.target.value))}
               onKeyDown={(e) => handleShiftStep(e, 'jMax')}
             />
           </div>
@@ -304,7 +354,7 @@ function App() {
               min={0.0001}
               max={0.01}
               step={0.0001}
-              onChange={(event) => setInputs({ ...inputs, dt: Number(event.target.value) })}
+              onChange={(e) => updateInput('dt', Number(e.target.value))}
               onKeyDown={(e) => handleShiftStep(e, 'dt')}
             />
           </div>
@@ -332,22 +382,7 @@ function App() {
             <h4 className="mb-2 text-sm text-[#9aa3b2]">Status</h4>
             <p className="text-lg">{planState.ok ? 'OK' : 'Not planned'}</p>
           </div>
-          <div className="rounded-lg border border-[#2a2a2a] bg-[#121212] p-3">
-            <h4 className="mb-2 text-sm text-[#9aa3b2]">Planned entry v</h4>
-            <p className="text-lg">{format(plannedBlock?.entryV ?? 0)}</p>
-          </div>
-          <div className="rounded-lg border border-[#2a2a2a] bg-[#121212] p-3">
-            <h4 className="mb-2 text-sm text-[#9aa3b2]">Planned exit v</h4>
-            <p className="text-lg">{format(plannedBlock?.exitV ?? 0)}</p>
-          </div>
-          <div className="rounded-lg border border-[#2a2a2a] bg-[#121212] p-3">
-            <h4 className="mb-2 text-sm text-[#9aa3b2]">Planned entry a</h4>
-            <p className="text-lg">{format(plannedBlock?.entryA ?? 0)}</p>
-          </div>
-          <div className="rounded-lg border border-[#2a2a2a] bg-[#121212] p-3">
-            <h4 className="mb-2 text-sm text-[#9aa3b2]">Planned exit a</h4>
-            <p className="text-lg">{format(plannedBlock?.exitA ?? 0)}</p>
-          </div>
+          
         </div>
       </section>
 
