@@ -111,7 +111,7 @@
  *         └─ Degenerate: a1 = -a_max → phase 7 = 0 entirely
  */
 class ConstantJerkTrajectoryGenerator {
-public:
+ public:
   ConstantJerkTrajectoryGenerator() = default;
 
   void plan(float initial_speed_in, float initial_accel_in,
@@ -128,9 +128,18 @@ public:
     j = jerk_in;
     distance = distance_in;
 
-    if (distance <= 0.0f) { CJP_SET_STATUS("distance <= 0"); return; }
-    if (j <= 0.0f) { CJP_SET_STATUS("j_max <= 0"); return; }
-    if (a_max <= 0.0f) { CJP_SET_STATUS("a_max <= 0"); return; }
+    if (distance <= 0.0f) {
+      CJP_SET_STATUS("distance <= 0");
+      return;
+    }
+    if (j <= 0.0f) {
+      CJP_SET_STATUS("j_max <= 0");
+      return;
+    }
+    if (a_max <= 0.0f) {
+      CJP_SET_STATUS("a_max <= 0");
+      return;
+    }
 
     const float v_nominal = fmaxf(0.0f, v_nominal_in);
 
@@ -140,10 +149,13 @@ public:
     // a_up = peak accel during ramp. t1=(a_up-a0)/j, t3=a_up/j
     // Triangle: a_up = sqrt(j*Δv + 0.5*a0²)
     // Trapezoidal: a_up = a_max, t2 fills remaining Δv
-    auto planAccel = [&](float v_peak, float &pa, float &pb, float &pc) -> float {
+    auto planAccel = [&](float v_peak, float& pa, float& pb, float& pc) -> float {
       float dv = v_peak - v0;
       float a_up_sq = j * dv + 0.5f * a0 * a0;
-      if (a_up_sq < 0) { pa = pb = pc = 0; return 0; }
+      if (a_up_sq < 0) {
+        pa = pb = pc = 0;
+        return 0;
+      }
       float a_up = sqrtf(a_up_sq);
 
       if (a_up <= a_max) {
@@ -158,8 +170,8 @@ public:
       }
 
       float v = v0, a_v = a0, s = 0;
-      simulatePhase( j, pa, v, a_v, s);
-      simulatePhase( 0, pb, v, a_v, s);
+      simulatePhase(j, pa, v, a_v, s);
+      simulatePhase(0, pb, v, a_v, s);
       simulatePhase(-j, pc, v, a_v, s);
       return s;
     };
@@ -168,10 +180,13 @@ public:
     // |a_dn| = peak decel magnitude. t5=|a_dn|/j, t7=(a1+|a_dn|)/j
     // Triangle: |a_dn| = sqrt(j*Δv + 0.5*a1²)
     // Trapezoidal: |a_dn| = a_max, t6 fills remaining Δv
-    auto planDecel = [&](float v_peak, float &pa, float &pb, float &pc) -> float {
+    auto planDecel = [&](float v_peak, float& pa, float& pb, float& pc) -> float {
       float dv = v_peak - v1;
       float a_dn_abs_sq = j * dv + 0.5f * a1 * a1;
-      if (a_dn_abs_sq < 0) { pa = pb = pc = 0; return 0; }
+      if (a_dn_abs_sq < 0) {
+        pa = pb = pc = 0;
+        return 0;
+      }
       float a_dn_abs = sqrtf(a_dn_abs_sq);
 
       if (a_dn_abs <= a_max) {
@@ -187,8 +202,8 @@ public:
 
       float v = v_peak, a_v = 0, s = 0;
       simulatePhase(-j, pa, v, a_v, s);
-      simulatePhase( 0, pb, v, a_v, s);
-      simulatePhase( j, pc, v, a_v, s);
+      simulatePhase(0, pb, v, a_v, s);
+      simulatePhase(j, pc, v, a_v, s);
       return s;
     };
 
@@ -198,8 +213,8 @@ public:
     };
 
     // Minimum feasible v_peak from each ramp constraint
-    float v_min_accel = (a0 >= 0) ? v0 + 0.5f*a0*a0/j : v0 - 0.5f*a0*a0/j;
-    float v_min_decel = (a1 <= 0) ? v1 + 0.5f*a1*a1/j : v1 - 0.5f*a1*a1/j;
+    float v_min_accel = (a0 >= 0) ? v0 + 0.5f * a0 * a0 / j : v0 - 0.5f * a0 * a0 / j;
+    float v_min_decel = (a1 <= 0) ? v1 + 0.5f * a1 * a1 / j : v1 - 0.5f * a1 * a1 / j;
     float v_lo = fmaxf(0.0f, fmaxf(v_min_accel, v_min_decel));
 
     float v_peak = fmaxf(v_lo, v_nominal);
@@ -216,8 +231,11 @@ public:
         // CJP_SET_STATUS("iterations: %d", i + 1);
         float mid = 0.5f * (v_lo + hi);
         float s_mid = totalRampDist(mid);
-        if (s_mid > distance) hi = mid; else v_lo = mid;
-        if (distance - s_mid >= 0 && distance - s_mid < 0.5f) break;
+        if (s_mid > distance)
+          hi = mid;
+        else
+          v_lo = mid;
+        if (distance - s_mid >= 0 && distance - s_mid < 0.01f) break;
       }
       v_peak = v_lo;
     }
@@ -238,9 +256,9 @@ public:
 
   float getTotalDuration() const { return total_duration; }
 #if CJP_DEBUG_STRINGS
-  const char *getStatus() const { return status_buf; }
+  const char* getStatus() const { return status_buf; }
 #else
-  const char *getStatus() const { return ""; }
+  const char* getStatus() const { return ""; }
 #endif
 
   float getDistanceAtTime(float t) const {
@@ -289,8 +307,8 @@ public:
     }
   }
 
-private:
-  static void simulatePhase(float jerk, float dt, float &v, float &a, float &s) {
+ private:
+  static void simulatePhase(float jerk, float dt, float& v, float& a, float& s) {
     if (dt <= 0.0f) return;
     s += v * dt + 0.5f * a * dt * dt + (1.0f / 6.0f) * jerk * dt * dt * dt;
     v += a * dt + 0.5f * jerk * dt * dt;
@@ -298,8 +316,12 @@ private:
   }
 
   void buildPhaseCache() {
-    phase_dt[0] = t1; phase_dt[1] = t2; phase_dt[2] = t3;
-    phase_dt[3] = t4; phase_dt[4] = t5; phase_dt[5] = t6;
+    phase_dt[0] = t1;
+    phase_dt[1] = t2;
+    phase_dt[2] = t3;
+    phase_dt[3] = t4;
+    phase_dt[4] = t5;
+    phase_dt[5] = t6;
     phase_dt[6] = t7;
 
     float v = v0, a = a0, s = 0.0f, t = 0.0f;
@@ -322,11 +344,16 @@ private:
   float phaseJerk(int phase) const {
     // phases: +j, 0, -j, 0, -j, 0, +j
     switch (phase) {
-      case 0: return  j;
-      case 2: return -j;
-      case 4: return -j;
-      case 6: return  j;
-      default: return 0.0f;
+      case 0:
+        return j;
+      case 2:
+        return -j;
+      case 4:
+        return -j;
+      case 6:
+        return j;
+      default:
+        return 0.0f;
     }
   }
 

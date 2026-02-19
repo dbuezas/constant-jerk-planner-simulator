@@ -176,6 +176,60 @@ void test_positive_exit_accel() {
   check("acc(end)",   traj.getAccelerationAtTime(dur), 200);
 }
 
+// Large positive exit accel, short distance: direct ramp needed
+// v0=0, a0=0, v1=100, a1=1000, nominal=100, distance=9, aMax=1200, jMax=8000
+// The standard v_peak approach fails because the forced a=0 intermediate
+// point wastes distance. A direct ramp (v0,a0)->(v1,a1) fits in ~5.4mm.
+void test_large_positive_exit_accel_short_distance() {
+  printf("test_large_positive_exit_accel_short_distance\n");
+  ConstantJerkTrajectoryGenerator traj;
+  traj.plan(0, 0, 100, 1000, 1200, 8000, 9, 100);
+  float dur = traj.getTotalDuration();
+
+  check("duration>0", dur > 0 ? 1 : 0, 1);
+  check("pos(end)",   traj.getDistanceAtTime(dur), 9, 0.1f);
+  check("vel(0)",     traj.getVelocityAtTime(0), 0);
+  check("vel(end)",   traj.getVelocityAtTime(dur), 100, 1.0f);
+  check("acc(0)",     traj.getAccelerationAtTime(0), 0);
+  check("acc(end)",   traj.getAccelerationAtTime(dur), 1000, 5.0f);
+  // Velocity should be non-negative throughout
+  if (dur > 0) {
+    float v_min = 1e9f;
+    float step = dur / 100;
+    for (float t = 0; t <= dur; t += step) {
+      float v = traj.getVelocityAtTime(t);
+      if (v < v_min) v_min = v;
+    }
+    check("vel>=0", v_min >= -0.01f ? 1 : 0, 1);
+  }
+}
+
+// Mirror of above: large negative entry accel, short distance
+// v0=100, a0=-1000, v1=0, a1=0, nominal=100, distance=9, aMax=1200, jMax=8000
+void test_large_negative_entry_accel_short_distance() {
+  printf("test_large_negative_entry_accel_short_distance\n");
+  ConstantJerkTrajectoryGenerator traj;
+  traj.plan(100, -1000, 0, 0, 1200, 8000, 9, 100);
+  float dur = traj.getTotalDuration();
+
+  check("duration>0", dur > 0 ? 1 : 0, 1);
+  check("pos(end)",   traj.getDistanceAtTime(dur), 9, 0.1f);
+  check("vel(0)",     traj.getVelocityAtTime(0), 100);
+  check("vel(end)",   traj.getVelocityAtTime(dur), 0, 1.0f);
+  check("acc(0)",     traj.getAccelerationAtTime(0), -1000);
+  check("acc(end)",   traj.getAccelerationAtTime(dur), 0, 5.0f);
+  // Velocity should be non-negative throughout
+  if (dur > 0) {
+    float v_min = 1e9f;
+    float step = dur / 100;
+    for (float t = 0; t <= dur; t += step) {
+      float v = traj.getVelocityAtTime(t);
+      if (v < v_min) v_min = v;
+    }
+    check("vel>=0", v_min >= -0.01f ? 1 : 0, 1);
+  }
+}
+
 int main() {
   test_pure_cruise();
   test_rest_to_rest_with_cruise();
@@ -187,6 +241,8 @@ int main() {
   test_negative_entry_accel();
   test_both_nonzero_accel();
   test_positive_exit_accel();
+  test_large_positive_exit_accel_short_distance();
+  test_large_negative_entry_accel_short_distance();
 
   printf("\n%d passed, %d failed\n", tests_passed, tests_failed);
   return tests_failed > 0 ? 1 : 0;
