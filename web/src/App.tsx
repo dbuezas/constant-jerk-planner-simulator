@@ -223,7 +223,7 @@ function App() {
 
     requestAnimationFrame(tick)
   }, [inputs])
-
+if (planState.sample?.status!=="OK") console.log({planState, inputs})
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-6">
       <section className="rounded-xl border border-[#333] bg-[#1d1d1d] px-5 py-4">
@@ -382,7 +382,7 @@ function App() {
           </div>
           <div className="rounded-lg border border-[#2a2a2a] bg-[#121212] p-3">
             <h4 className="mb-2 text-sm text-[#9aa3b2]">Status</h4>
-            <p className="text-lg">{planState.ok ? 'OK' : 'Not planned'}</p>
+            <p className="text-lg">{planState.sample?.status || 'Not planned'}</p>
           </div>
           <div className="rounded-lg border border-[#2a2a2a] bg-[#121212] p-3">
             <h4 className="mb-2 text-sm text-[#9aa3b2]">Plan time</h4>

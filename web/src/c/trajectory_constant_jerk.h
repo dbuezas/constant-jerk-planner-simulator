@@ -1,6 +1,17 @@
 
 #pragma once
 
+#ifndef CJP_DEBUG_STRINGS
+#define CJP_DEBUG_STRINGS 1
+#endif
+
+#if CJP_DEBUG_STRINGS
+#include <stdio.h>
+#define CJP_SET_STATUS(...) snprintf(status_buf, sizeof(status_buf), __VA_ARGS__)
+#else
+#define CJP_SET_STATUS(...) ((void)0)
+#endif
+
 #include <math.h>
 
 /**
@@ -117,7 +128,9 @@ public:
     j = jerk_in;
     distance = distance_in;
 
-    if (distance <= 0.0f || j <= 0.0f || a_max <= 0.0f) return;
+    if (distance <= 0.0f) { CJP_SET_STATUS("distance <= 0"); return; }
+    if (j <= 0.0f) { CJP_SET_STATUS("j_max <= 0"); return; }
+    if (a_max <= 0.0f) { CJP_SET_STATUS("a_max <= 0"); return; }
 
     const float v_nominal = fmaxf(0.0f, v_nominal_in);
 
@@ -195,12 +208,16 @@ public:
     if (s_ramps > distance) {
       // v_peak doesn't fit — binary search until undershoot < tolerance
       float hi = v_peak;
-      if (totalRampDist(v_lo) > distance) return;
+      if (totalRampDist(v_lo) > distance) {
+        CJP_SET_STATUS("minimum ramp distance exceeds block distance");
+        return;
+      }
       for (int i = 0; i < 48; i++) {
+        // CJP_SET_STATUS("iterations: %d", i + 1);
         float mid = 0.5f * (v_lo + hi);
         float s_mid = totalRampDist(mid);
         if (s_mid > distance) hi = mid; else v_lo = mid;
-        if (distance - s_mid >= 0 && distance - s_mid < 0.1f) break;
+        if (distance - s_mid >= 0 && distance - s_mid < 0.5f) break;
       }
       v_peak = v_lo;
     }
@@ -216,9 +233,15 @@ public:
 
     total_duration = t1 + t2 + t3 + t4 + t5 + t6 + t7;
     buildPhaseCache();
+    CJP_SET_STATUS("OK");
   }
 
   float getTotalDuration() const { return total_duration; }
+#if CJP_DEBUG_STRINGS
+  const char *getStatus() const { return status_buf; }
+#else
+  const char *getStatus() const { return ""; }
+#endif
 
   float getDistanceAtTime(float t) const {
     if (t <= 0.0f) return 0.0f;
@@ -309,6 +332,9 @@ private:
 
   float v0 = 0, a0 = 0, v1 = 0, a1 = 0;
   float a_max = 0, j = 0, distance = 0;
+#if CJP_DEBUG_STRINGS
+  char status_buf[128] = "";
+#endif
   float t1 = 0, t2 = 0, t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0;
   float total_duration = 0;
   float phase_dt[7] = {};

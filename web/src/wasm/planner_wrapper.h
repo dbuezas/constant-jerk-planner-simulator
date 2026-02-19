@@ -16,6 +16,7 @@ float cjp_traj_velocity(float t);
 float cjp_traj_acceleration(float t);
 float cjp_traj_jerk(float t);
 float cjp_traj_plan_time_us(void);
+const char *cjp_traj_status(void);
 
 #ifdef __cplusplus
 }

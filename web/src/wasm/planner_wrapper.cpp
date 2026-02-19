@@ -54,6 +54,10 @@ float cjp_traj_plan_time_us(void) {
   return g_plan_time_us;
 }
 
+const char *cjp_traj_status(void) {
+  return g_traj.getStatus();
+}
+
 float cjp_traj_duration(void) {
   return g_traj.getTotalDuration();
 }
