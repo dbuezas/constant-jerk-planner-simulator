@@ -80,7 +80,7 @@ function App() {
     const step = Number(el.step) * 10
     const current = Number(el.value)
     const delta = e.key === 'ArrowUp' ? step : -step
-    const clamped = Math.min(Number(el.max), Math.max(Number(el.min), current + delta))
+    const clamped = Math.min(Number(el.max||Number.POSITIVE_INFINITY), Math.max(Number(el.min||Number.NEGATIVE_INFINITY), current + delta))
     updateInput(key, clamped)
   }
 
@@ -236,7 +236,7 @@ function App() {
               type="number"
               value={inputs.entryV}
               min={0}
-              max={200}
+              // max={200}
               step={1}
               onChange={(e) => updateInput('entryV', Number(e.target.value))}
               onKeyDown={(e) => handleShiftStep(e, 'entryV')}
@@ -250,7 +250,7 @@ function App() {
               type="number"
               value={inputs.exitV}
               min={0}
-              max={200}
+              // max={200}
               step={1}
               onChange={(e) => updateInput('exitV', Number(e.target.value))}
               onKeyDown={(e) => handleShiftStep(e, 'exitV')}
@@ -263,8 +263,8 @@ function App() {
               id="entryA"
               type="number"
               value={inputs.entryA}
-              min={-2000}
-              max={2000}
+              // min={-2000}
+              // max={2000}
               step={10}
               onChange={(e) => updateInput('entryA', Number(e.target.value))}
               onKeyDown={(e) => handleShiftStep(e, 'entryA')}
@@ -277,8 +277,8 @@ function App() {
               id="exitA"
               type="number"
               value={inputs.exitA}
-              min={-2000}
-              max={2000}
+              // min={-2000}
+              // max={2000}
               step={10}
               onChange={(e) => updateInput('exitA', Number(e.target.value))}
               onKeyDown={(e) => handleShiftStep(e, 'exitA')}
@@ -292,7 +292,7 @@ function App() {
               type="number"
               value={inputs.nominal}
               min={1}
-              max={200}
+              // max={200}
               step={1}
               onChange={(e) => updateInput('nominal', Number(e.target.value))}
               onKeyDown={(e) => handleShiftStep(e, 'nominal')}
@@ -306,7 +306,7 @@ function App() {
               type="number"
               value={inputs.maxEntry}
               min={0}
-              max={200}
+              // max={200}
               step={1}
               onChange={(e) => updateInput('maxEntry', Number(e.target.value))}
               onKeyDown={(e) => handleShiftStep(e, 'maxEntry')}
@@ -320,7 +320,7 @@ function App() {
               type="number"
               value={inputs.distance}
               min={0}
-              max={200}
+              // max={200}
               step={1}
               onChange={(e) => updateInput('distance', Number(e.target.value))}
               onKeyDown={(e) => handleShiftStep(e, 'distance')}
@@ -334,7 +334,7 @@ function App() {
               type="number"
               value={inputs.aMax}
               min={0}
-              max={20000}
+              // max={20000}
               step={10}
               onChange={(e) => updateInput('aMax', Number(e.target.value))}
               onKeyDown={(e) => handleShiftStep(e, 'aMax')}
@@ -348,7 +348,7 @@ function App() {
               type="number"
               value={inputs.jMax}
               min={0}
-              max={20000}
+              // max={20000}
               step={100}
               onChange={(e) => updateInput('jMax', Number(e.target.value))}
               onKeyDown={(e) => handleShiftStep(e, 'jMax')}

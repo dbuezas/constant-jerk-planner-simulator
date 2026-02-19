@@ -193,12 +193,14 @@ public:
     float s_ramps = totalRampDist(v_peak);
 
     if (s_ramps > distance) {
-      // v_peak doesn't fit — binary search
+      // v_peak doesn't fit — binary search until undershoot < tolerance
       float hi = v_peak;
       if (totalRampDist(v_lo) > distance) return;
       for (int i = 0; i < 48; i++) {
         float mid = 0.5f * (v_lo + hi);
-        if (totalRampDist(mid) > distance) hi = mid; else v_lo = mid;
+        float s_mid = totalRampDist(mid);
+        if (s_mid > distance) hi = mid; else v_lo = mid;
+        if (distance - s_mid >= 0 && distance - s_mid < 0.1f) break;
       }
       v_peak = v_lo;
     }
@@ -207,7 +209,7 @@ public:
     float s_accel = planAccel(v_peak, t1, t2, t3);
     float s_decel = planDecel(v_peak, t5, t6, t7);
 
-    // Cruise phase
+    // Cruise phase absorbs any remaining distance
     s_ramps = s_accel + s_decel;
     if (v_peak > 0.0f && distance > s_ramps)
       t4 = (distance - s_ramps) / v_peak;
