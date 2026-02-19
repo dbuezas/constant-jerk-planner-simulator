@@ -1,6 +1,6 @@
 import Editor from "@monaco-editor/react";
 import Plotly from "plotly.js-dist-min";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   type BlockDefinition,
@@ -65,7 +65,7 @@ export default function MultiBlockView() {
     return () => ro.disconnect();
   }, []);
 
-  async function runMultiBlock() {
+  const runMultiBlock = useCallback(async () => {
     setError(null);
     try {
       const blocks = JSON.parse(blocksJson) as BlockDefinition[];
@@ -81,7 +81,7 @@ export default function MultiBlockView() {
       setError((err as Error).message);
       setResult(null);
     }
-  }
+  }, [blocksJson, dt]);
 
   useEffect(() => {
     if (!plotRef.current || !result) return;
@@ -160,6 +160,9 @@ export default function MultiBlockView() {
     });
   }, [result, plotHeight]);
 
+  useEffect(() => {
+    runMultiBlock();
+  }, [blocksJson, runMultiBlock]);
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-6">
       <section className="rounded-xl border border-[#333] bg-[#1d1d1d] px-5 py-4">
@@ -187,14 +190,6 @@ export default function MultiBlockView() {
               />
             </div>
           </div>
-          <div className="flex flex-col gap-3 pt-6">
-            <button
-              onClick={runMultiBlock}
-              className="rounded-md bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-500"
-            >
-              Plan
-            </button>
-          </div>
         </div>
 
         {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
@@ -220,8 +215,12 @@ export default function MultiBlockView() {
                   {result.blocks.map((b, i) => (
                     <tr key={i} className="border-b border-[#222]">
                       <td className="px-2 py-1 text-[#9aa3b2]">{i}</td>
-                      <td className="px-2 py-1">{format(b.input.millimeters, 2)}</td>
-                      <td className="px-2 py-1">{format(b.input.nominal, 2)}</td>
+                      <td className="px-2 py-1">
+                        {format(b.input.millimeters, 2)}
+                      </td>
+                      <td className="px-2 py-1">
+                        {format(b.input.nominal, 2)}
+                      </td>
                       <td className="px-2 py-1">{format(b.input.aMax, 2)}</td>
                       <td className="px-2 py-1">{format(b.input.jMax, 2)}</td>
                       <td className="px-2 py-1 text-orange-300">
