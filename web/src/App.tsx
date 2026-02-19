@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Plotly from 'plotly.js-dist-min'
-import './App.css'
 import { planAndSample, type TrajectorySample } from './wasm/planner_wasm_loader'
 
 const DEFAULTS = {
@@ -143,12 +142,13 @@ function App() {
   }, [inputs])
 
   return (
-    <div className="app">
-      <section className="panel">
-        <div className="controls">
-          <div className="control">
-            <label htmlFor="entryV">Entry velocity (mm/s)</label>
+    <div className="grid gap-6">
+      <section className="rounded-xl border border-[#333] bg-[#1d1d1d] px-5 py-4">
+        <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
+          <div className="grid gap-1.5 text-left">
+            <label className="text-sm text-[#b8b8b8]" htmlFor="entryV">Entry velocity (mm/s)</label>
             <input
+              className="rounded-md border border-[#333] bg-[#111] px-2 py-2 text-white"
               id="entryV"
               type="number"
               value={inputs.entryV}
@@ -158,9 +158,10 @@ function App() {
               onChange={(event) => setInputs({ ...inputs, entryV: Number(event.target.value) })}
             />
           </div>
-          <div className="control">
-            <label htmlFor="exitV">Exit velocity (mm/s)</label>
+          <div className="grid gap-1.5 text-left">
+            <label className="text-sm text-[#b8b8b8]" htmlFor="exitV">Exit velocity (mm/s)</label>
             <input
+              className="rounded-md border border-[#333] bg-[#111] px-2 py-2 text-white"
               id="exitV"
               type="number"
               value={inputs.exitV}
@@ -170,9 +171,10 @@ function App() {
               onChange={(event) => setInputs({ ...inputs, exitV: Number(event.target.value) })}
             />
           </div>
-          <div className="control">
-            <label htmlFor="nominal">Nominal velocity (mm/s)</label>
+          <div className="grid gap-1.5 text-left">
+            <label className="text-sm text-[#b8b8b8]" htmlFor="nominal">Nominal velocity (mm/s)</label>
             <input
+              className="rounded-md border border-[#333] bg-[#111] px-2 py-2 text-white"
               id="nominal"
               type="number"
               value={inputs.nominal}
@@ -182,9 +184,10 @@ function App() {
               onChange={(event) => setInputs({ ...inputs, nominal: Number(event.target.value) })}
             />
           </div>
-          <div className="control">
-            <label htmlFor="maxEntry">Max entry speed (mm/s)</label>
+          <div className="grid gap-1.5 text-left">
+            <label className="text-sm text-[#b8b8b8]" htmlFor="maxEntry">Max entry speed (mm/s)</label>
             <input
+              className="rounded-md border border-[#333] bg-[#111] px-2 py-2 text-white"
               id="maxEntry"
               type="number"
               value={inputs.maxEntry}
@@ -194,9 +197,10 @@ function App() {
               onChange={(event) => setInputs({ ...inputs, maxEntry: Number(event.target.value) })}
             />
           </div>
-          <div className="control">
-            <label htmlFor="distance">Distance (mm)</label>
+          <div className="grid gap-1.5 text-left">
+            <label className="text-sm text-[#b8b8b8]" htmlFor="distance">Distance (mm)</label>
             <input
+              className="rounded-md border border-[#333] bg-[#111] px-2 py-2 text-white"
               id="distance"
               type="number"
               value={inputs.distance}
@@ -206,9 +210,10 @@ function App() {
               onChange={(event) => setInputs({ ...inputs, distance: Number(event.target.value) })}
             />
           </div>
-          <div className="control">
-            <label htmlFor="aMax">A max (mm/s²)</label>
+          <div className="grid gap-1.5 text-left">
+            <label className="text-sm text-[#b8b8b8]" htmlFor="aMax">A max (mm/s²)</label>
             <input
+              className="rounded-md border border-[#333] bg-[#111] px-2 py-2 text-white"
               id="aMax"
               type="number"
               value={inputs.aMax}
@@ -218,9 +223,10 @@ function App() {
               onChange={(event) => setInputs({ ...inputs, aMax: Number(event.target.value) })}
             />
           </div>
-          <div className="control">
-            <label htmlFor="jMax">J max (mm/s³)</label>
+          <div className="grid gap-1.5 text-left">
+            <label className="text-sm text-[#b8b8b8]" htmlFor="jMax">J max (mm/s³)</label>
             <input
+              className="rounded-md border border-[#333] bg-[#111] px-2 py-2 text-white"
               id="jMax"
               type="number"
               value={inputs.jMax}
@@ -230,9 +236,10 @@ function App() {
               onChange={(event) => setInputs({ ...inputs, jMax: Number(event.target.value) })}
             />
           </div>
-          <div className="control">
-            <label htmlFor="dt">Sample dt (s)</label>
+          <div className="grid gap-1.5 text-left">
+            <label className="text-sm text-[#b8b8b8]" htmlFor="dt">Sample dt (s)</label>
             <input
+              className="rounded-md border border-[#333] bg-[#111] px-2 py-2 text-white"
               id="dt"
               type="number"
               value={inputs.dt}
@@ -243,50 +250,50 @@ function App() {
             />
           </div>
         </div>
-        <div className="actions">
-          {planState.error ? <span className="status">{planState.error}</span> : null}
+        <div className="mt-4 flex items-center gap-3">
+          {planState.error ? <span className="text-sm text-[#9aa3b2]">{planState.error}</span> : null}
         </div>
       </section>
 
-      <section className="panel">
-        <div className="summary">
-          <div className="summary-item">
-            <h4>Duration (s)</h4>
-            <p>{format(planState.sample?.duration ?? 0)}</p>
+      <section className="rounded-xl border border-[#333] bg-[#1d1d1d] px-5 py-4">
+        <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
+          <div className="rounded-lg border border-[#2a2a2a] bg-[#121212] p-3">
+            <h4 className="mb-2 text-sm text-[#9aa3b2]">Duration (s)</h4>
+            <p className="text-lg">{format(planState.sample?.duration ?? 0)}</p>
           </div>
-          <div className="summary-item">
-            <h4>Distance (mm)</h4>
-            <p>{format(planState.sample?.position.at(-1) ?? 0)}</p>
+          <div className="rounded-lg border border-[#2a2a2a] bg-[#121212] p-3">
+            <h4 className="mb-2 text-sm text-[#9aa3b2]">Distance (mm)</h4>
+            <p className="text-lg">{format(planState.sample?.position.at(-1) ?? 0)}</p>
           </div>
-          <div className="summary-item">
-            <h4>Vmax (mm/s)</h4>
-            <p>{format(vmax)}</p>
+          <div className="rounded-lg border border-[#2a2a2a] bg-[#121212] p-3">
+            <h4 className="mb-2 text-sm text-[#9aa3b2]">Vmax (mm/s)</h4>
+            <p className="text-lg">{format(vmax)}</p>
           </div>
-          <div className="summary-item">
-            <h4>Status</h4>
-            <p>{planState.ok ? 'OK' : 'Not planned'}</p>
+          <div className="rounded-lg border border-[#2a2a2a] bg-[#121212] p-3">
+            <h4 className="mb-2 text-sm text-[#9aa3b2]">Status</h4>
+            <p className="text-lg">{planState.ok ? 'OK' : 'Not planned'}</p>
           </div>
-          <div className="summary-item">
-            <h4>Planned entry v</h4>
-            <p>{format(plannedBlock?.entryV ?? 0)}</p>
+          <div className="rounded-lg border border-[#2a2a2a] bg-[#121212] p-3">
+            <h4 className="mb-2 text-sm text-[#9aa3b2]">Planned entry v</h4>
+            <p className="text-lg">{format(plannedBlock?.entryV ?? 0)}</p>
           </div>
-          <div className="summary-item">
-            <h4>Planned exit v</h4>
-            <p>{format(plannedBlock?.exitV ?? 0)}</p>
+          <div className="rounded-lg border border-[#2a2a2a] bg-[#121212] p-3">
+            <h4 className="mb-2 text-sm text-[#9aa3b2]">Planned exit v</h4>
+            <p className="text-lg">{format(plannedBlock?.exitV ?? 0)}</p>
           </div>
-          <div className="summary-item">
-            <h4>Planned entry a</h4>
-            <p>{format(plannedBlock?.entryA ?? 0)}</p>
+          <div className="rounded-lg border border-[#2a2a2a] bg-[#121212] p-3">
+            <h4 className="mb-2 text-sm text-[#9aa3b2]">Planned entry a</h4>
+            <p className="text-lg">{format(plannedBlock?.entryA ?? 0)}</p>
           </div>
-          <div className="summary-item">
-            <h4>Planned exit a</h4>
-            <p>{format(plannedBlock?.exitA ?? 0)}</p>
+          <div className="rounded-lg border border-[#2a2a2a] bg-[#121212] p-3">
+            <h4 className="mb-2 text-sm text-[#9aa3b2]">Planned exit a</h4>
+            <p className="text-lg">{format(plannedBlock?.exitA ?? 0)}</p>
           </div>
         </div>
       </section>
 
 
-      <section className="panel plot">
+      <section className="min-h-[600px] rounded-xl border border-[#333] bg-[#1d1d1d] px-5 py-4">
         <div ref={plotRef} />
       </section>
     </div>
