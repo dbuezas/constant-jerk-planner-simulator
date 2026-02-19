@@ -2,8 +2,10 @@
 
 #include "constant-jerk-planner.h"
 #include "trajectory_constant_jerk.h"
+#include <chrono>
 
 static ConstantJerkTrajectoryGenerator g_traj;
+static float g_plan_time_us = 0;
 
 int cjp_plan_single_block(float mm, float max_entry_speed, float nominal, float a_max, float j_max) {
   cjp_reset();
@@ -35,8 +37,21 @@ void cjp_traj_reset(void) {
 
 int cjp_traj_plan(float entry_v, float entry_a, float exit_v, float exit_a,
                   float a_max, float j_max, float mm, float nominal) {
-  g_traj.plan(entry_v, entry_a, exit_v, exit_a, a_max, j_max, mm, nominal);
+  auto start = std::chrono::high_resolution_clock::now();
+  int n = 0;
+  float elapsed_us;
+  do {
+    g_traj.plan(entry_v, entry_a, exit_v, exit_a, a_max, j_max, mm, nominal);
+    n++;
+    elapsed_us = std::chrono::duration<float, std::micro>(
+        std::chrono::high_resolution_clock::now() - start).count();
+  } while (elapsed_us < 1000.0f);
+  g_plan_time_us = elapsed_us / n;
   return g_traj.getTotalDuration() > 0.0f ? 1 : 0;
+}
+
+float cjp_traj_plan_time_us(void) {
+  return g_plan_time_us;
 }
 
 float cjp_traj_duration(void) {

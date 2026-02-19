@@ -380,7 +380,10 @@ function App() {
             <h4 className="mb-2 text-sm text-[#9aa3b2]">Status</h4>
             <p className="text-lg">{planState.ok ? 'OK' : 'Not planned'}</p>
           </div>
-          
+          <div className="rounded-lg border border-[#2a2a2a] bg-[#121212] p-3">
+            <h4 className="mb-2 text-sm text-[#9aa3b2]">Plan time</h4>
+            <p className="text-lg">{format(planState.sample?.planTimeUs ?? 0, 3)} &micro;s</p>
+          </div>
         </div>
       </section>
 

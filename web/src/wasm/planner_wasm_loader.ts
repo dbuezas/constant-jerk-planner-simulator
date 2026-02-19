@@ -36,6 +36,7 @@ export type TrajectorySample = {
   acceleration: number[]
   jerk: number[]
   duration: number
+  planTimeUs: number
   block: {
     millimeters: number
     maxEntrySpeed: number
@@ -86,6 +87,7 @@ export async function planAndSample(input: TrajectoryPlanInput, dt: number): Pro
   const velocity = mod.cwrap('cjp_traj_velocity', 'number', ['number'])
   const acceleration = mod.cwrap('cjp_traj_acceleration', 'number', ['number'])
   const jerk = mod.cwrap('cjp_traj_jerk', 'number', ['number'])
+  const planTimeUs = mod.cwrap('cjp_traj_plan_time_us', 'number', [])
   const malloc = mod.cwrap('malloc', 'number', ['number'])
   const free = mod.cwrap('free', null, ['number'])
 
@@ -112,6 +114,7 @@ export async function planAndSample(input: TrajectoryPlanInput, dt: number): Pro
 
   reset()
   const ok = plan(entryV, entryA, exitV, exitA, aMax, jMax, distance, nominal)
+  const ptime = planTimeUs()
   if (!ok) {
     return {
       times: [],
@@ -120,6 +123,7 @@ export async function planAndSample(input: TrajectoryPlanInput, dt: number): Pro
       acceleration: [],
       jerk: [],
       duration: 0,
+      planTimeUs: ptime,
       block,
     }
   }
@@ -133,6 +137,7 @@ export async function planAndSample(input: TrajectoryPlanInput, dt: number): Pro
       acceleration: [],
       jerk: [],
       duration: 0,
+      planTimeUs: ptime,
       block,
     }
   }
@@ -171,6 +176,7 @@ export async function planAndSample(input: TrajectoryPlanInput, dt: number): Pro
     acceleration: acc,
     jerk: jrk,
     duration: total,
+    planTimeUs: ptime,
     block,
   }
 }

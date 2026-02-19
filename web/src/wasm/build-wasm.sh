@@ -23,6 +23,6 @@ ${EMCC} \
   -s EXPORT_ES6=1 \
   -s ENVIRONMENT=web \
   -s ALLOW_MEMORY_GROWTH=1 \
-  -s EXPORTED_FUNCTIONS='["_cjp_plan_single_block","_cjp_get_first_block","_cjp_traj_reset","_cjp_traj_plan","_cjp_traj_duration","_cjp_traj_position","_cjp_traj_velocity","_cjp_traj_acceleration","_cjp_traj_jerk","_malloc","_free"]' \
+  -s EXPORTED_FUNCTIONS='["_cjp_plan_single_block","_cjp_get_first_block","_cjp_traj_reset","_cjp_traj_plan","_cjp_traj_duration","_cjp_traj_position","_cjp_traj_velocity","_cjp_traj_acceleration","_cjp_traj_jerk","_cjp_traj_plan_time_us","_malloc","_free"]' \
   -s EXPORTED_RUNTIME_METHODS='["cwrap","getValue","setValue","HEAPF32"]' \
   -o "${OUT_DIR}/planner_wasm.js"
