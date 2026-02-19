@@ -13,7 +13,26 @@ const DEFAULTS = {
   dt: 0.0005,
 }
 
+const ANIM_DURATION = 500
+
 type InputState = typeof DEFAULTS
+
+function lerp(a: number, b: number, t: number) {
+  return a + (b - a) * t
+}
+
+function lerpInputs(from: InputState, to: InputState, t: number): InputState {
+  return {
+    entryV: lerp(from.entryV, to.entryV, t),
+    exitV: lerp(from.exitV, to.exitV, t),
+    nominal: lerp(from.nominal, to.nominal, t),
+    maxEntry: lerp(from.maxEntry, to.maxEntry, t),
+    distance: lerp(from.distance, to.distance, t),
+    aMax: lerp(from.aMax, to.aMax, t),
+    jMax: lerp(from.jMax, to.jMax, t),
+    dt: lerp(from.dt, to.dt, t),
+  }
+}
 
 type PlanState = {
   sample: TrajectorySample | null
@@ -29,6 +48,19 @@ function App() {
   const [inputs, setInputs] = useState<InputState>(DEFAULTS)
   const [planState, setPlanState] = useState<PlanState>({ sample: null, ok: false, error: null })
   const plotRef = useRef<HTMLDivElement | null>(null)
+  const displayedInputsRef = useRef<InputState>(DEFAULTS)
+  const animGenRef = useRef(0)
+
+  function handleShiftStep(e: React.KeyboardEvent<HTMLInputElement>, key: keyof InputState) {
+    if (!e.shiftKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return
+    e.preventDefault()
+    const el = e.currentTarget
+    const step = Number(el.step) * 10
+    const current = Number(el.value)
+    const delta = e.key === 'ArrowUp' ? step : -step
+    const clamped = Math.min(Number(el.max), Math.max(Number(el.min), current + delta))
+    setInputs(prev => ({ ...prev, [key]: clamped }))
+  }
 
   const vmax = useMemo(() => {
     if (!planState.sample || planState.sample.velocity.length === 0) return 0
@@ -113,32 +145,51 @@ function App() {
     void Plotly.react(plotRef.current, traces, layout, { displaylogo: false, responsive: true })
   }, [planState.sample])
 
-  async function runPlan() {
+  async function runPlan(planInputs: InputState) {
     setPlanState((prev) => ({ ...prev, error: null }))
     try {
       const sample = await planAndSample(
         {
-          entryV: inputs.entryV,
+          entryV: planInputs.entryV,
           entryA: 0,
-          exitV: inputs.exitV,
+          exitV: planInputs.exitV,
           exitA: 0,
-          aMax: inputs.aMax,
-          jMax: inputs.jMax,
-          distance: inputs.distance,
-          nominal: inputs.nominal,
-          maxEntry: inputs.maxEntry,
+          aMax: planInputs.aMax,
+          jMax: planInputs.jMax,
+          distance: planInputs.distance,
+          nominal: planInputs.nominal,
+          maxEntry: planInputs.maxEntry,
         },
-        inputs.dt
+        planInputs.dt
       )
       const ok = sample.duration > 0
       setPlanState({ sample, ok, error: ok ? null : 'Planner returned zero duration.' })
     } catch (err) {
       setPlanState({ sample: null, ok: false, error: (err as Error).message })
-    } 
+    }
   }
 
   useEffect(() => {
-    void runPlan()
+    const gen = ++animGenRef.current
+    const from = { ...displayedInputsRef.current }
+    const to = inputs
+    const startTime = performance.now()
+
+    function tick() {
+      if (animGenRef.current !== gen) return
+      const elapsed = performance.now() - startTime
+      const t = Math.min(elapsed / ANIM_DURATION, 1)
+      const interpolated = lerpInputs(from, to, t)
+      displayedInputsRef.current = interpolated
+
+      void runPlan(interpolated).then(() => {
+        if (t < 1 && animGenRef.current === gen) {
+          requestAnimationFrame(tick)
+        }
+      })
+    }
+
+    requestAnimationFrame(tick)
   }, [inputs])
 
   return (
@@ -156,6 +207,7 @@ function App() {
               max={200}
               step={1}
               onChange={(event) => setInputs({ ...inputs, entryV: Number(event.target.value) })}
+              onKeyDown={(e) => handleShiftStep(e, 'entryV')}
             />
           </div>
           <div className="grid gap-1.5 text-left">
@@ -169,6 +221,7 @@ function App() {
               max={200}
               step={1}
               onChange={(event) => setInputs({ ...inputs, exitV: Number(event.target.value) })}
+              onKeyDown={(e) => handleShiftStep(e, 'exitV')}
             />
           </div>
           <div className="grid gap-1.5 text-left">
@@ -182,6 +235,7 @@ function App() {
               max={200}
               step={1}
               onChange={(event) => setInputs({ ...inputs, nominal: Number(event.target.value) })}
+              onKeyDown={(e) => handleShiftStep(e, 'nominal')}
             />
           </div>
           <div className="grid gap-1.5 text-left">
@@ -195,6 +249,7 @@ function App() {
               max={200}
               step={1}
               onChange={(event) => setInputs({ ...inputs, maxEntry: Number(event.target.value) })}
+              onKeyDown={(e) => handleShiftStep(e, 'maxEntry')}
             />
           </div>
           <div className="grid gap-1.5 text-left">
@@ -208,6 +263,7 @@ function App() {
               max={200}
               step={1}
               onChange={(event) => setInputs({ ...inputs, distance: Number(event.target.value) })}
+              onKeyDown={(e) => handleShiftStep(e, 'distance')}
             />
           </div>
           <div className="grid gap-1.5 text-left">
@@ -221,6 +277,7 @@ function App() {
               max={2000}
               step={1}
               onChange={(event) => setInputs({ ...inputs, aMax: Number(event.target.value) })}
+              onKeyDown={(e) => handleShiftStep(e, 'aMax')}
             />
           </div>
           <div className="grid gap-1.5 text-left">
@@ -234,6 +291,7 @@ function App() {
               max={20000}
               step={100}
               onChange={(event) => setInputs({ ...inputs, jMax: Number(event.target.value) })}
+              onKeyDown={(e) => handleShiftStep(e, 'jMax')}
             />
           </div>
           <div className="grid gap-1.5 text-left">
@@ -247,6 +305,7 @@ function App() {
               max={0.01}
               step={0.0001}
               onChange={(event) => setInputs({ ...inputs, dt: Number(event.target.value) })}
+              onKeyDown={(e) => handleShiftStep(e, 'dt')}
             />
           </div>
         </div>
