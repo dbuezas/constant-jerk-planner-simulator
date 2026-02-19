@@ -84,6 +84,18 @@ function App() {
     updateInput(key, clamped)
   }
 
+  const [plotHeight, setPlotHeight] = useState(600)
+
+  useEffect(() => {
+    const el = plotRef.current
+    if (!el) return
+    const ro = new ResizeObserver(([entry]) => {
+      setPlotHeight(entry.contentRect.height)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
   const vmax = useMemo(() => {
     if (!planState.sample || planState.sample.velocity.length === 0) return 0
     return Math.max(...planState.sample.velocity)
@@ -102,10 +114,10 @@ function App() {
       xaxis3: { matches: 'x', showticklabels: true, title: 'time (s)' },
       xaxis4: { matches: 'x', showticklabels: true, title: 'time (s)' },
       yaxis: { title: 'position (mm)' },
-      yaxis2: { title: 'velocity (mm/s)' },
+      yaxis2: { title: 'velocity (mm/s)', rangemode: 'tozero' },
       yaxis3: { title: 'acceleration (mm/s²)' },
       yaxis4: { title: 'jerk (mm/s³)' },
-      height: 1200,
+      height: plotHeight,
       showlegend: true,
       paper_bgcolor: '#141414',
       plot_bgcolor: '#141414',
@@ -163,7 +175,7 @@ function App() {
     ]
 
     void Plotly.react(plotRef.current, traces, layout, { displaylogo: false, responsive: true })
-  }, [planState.sample])
+  }, [planState.sample, plotHeight])
 
   async function runPlan(planInputs: InputState) {
     setPlanState((prev) => ({ ...prev, error: null }))
@@ -213,7 +225,7 @@ function App() {
   }, [inputs])
 
   return (
-    <div className="grid gap-6">
+    <div className="flex min-h-0 flex-1 flex-col gap-6">
       <section className="rounded-xl border border-[#333] bg-[#1d1d1d] px-5 py-4">
         <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
           <div className="grid gap-1.5 text-left">
@@ -356,14 +368,6 @@ function App() {
               onKeyDown={(e) => handleShiftStep(e, 'dt')}
             />
           </div>
-        </div>
-        <div className="mt-4 flex items-center gap-3">
-          {planState.error ? <span className="text-sm text-[#9aa3b2]">{planState.error}</span> : null}
-        </div>
-      </section>
-
-      <section className="rounded-xl border border-[#333] bg-[#1d1d1d] px-5 py-4">
-        <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
           <div className="rounded-lg border border-[#2a2a2a] bg-[#121212] p-3">
             <h4 className="mb-2 text-sm text-[#9aa3b2]">Duration (s)</h4>
             <p className="text-lg">{format(planState.sample?.duration ?? 0)}</p>
@@ -385,11 +389,15 @@ function App() {
             <p className="text-lg">{format(planState.sample?.planTimeUs ?? 0, 3)} &micro;s</p>
           </div>
         </div>
+        
+        <div className="mt-4 flex items-center gap-3">
+          {planState.error ? <span className="text-sm text-[#9aa3b2]">{planState.error}</span> : null}
+        </div>
+        
       </section>
 
-
-      <section className="min-h-[600px] rounded-xl border border-[#333] bg-[#1d1d1d] px-5 py-4">
-        <div ref={plotRef} />
+      <section className="flex min-h-0 flex-1 flex-col rounded-xl border border-[#333] bg-[#1d1d1d] px-5 py-4">
+        <div ref={plotRef} className="min-h-0 flex-1" />
       </section>
     </div>
   )
