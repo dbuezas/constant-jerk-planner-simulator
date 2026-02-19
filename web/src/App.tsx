@@ -89,8 +89,6 @@ function App() {
     return Math.max(...planState.sample.velocity)
   }, [planState.sample])
 
-  const plannedBlock = planState.sample?.block
-
   useEffect(() => {
     if (!plotRef.current || !planState.sample) return
 

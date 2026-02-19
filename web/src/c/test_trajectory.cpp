@@ -97,12 +97,96 @@ void test_moving_to_rest() {
   check("vel(end)",    traj.getVelocityAtTime(dur), 0);
 }
 
+// Positive entry accel: v0=0, a0=200, v1=0, a1=0
+// Must account for velocity gained while unwinding a0
+void test_positive_entry_accel() {
+  printf("test_positive_entry_accel\n");
+  ConstantJerkTrajectoryGenerator traj;
+  traj.plan(0, 200, 0, 0, 500, 8000, 35, 31);
+  float dur = traj.getTotalDuration();
+
+  check("duration>0", dur > 0 ? 1 : 0, 1);
+  check("pos(end)",   traj.getDistanceAtTime(dur), 35);
+  check("vel(0)",     traj.getVelocityAtTime(0), 0);
+  check("vel(end)",   traj.getVelocityAtTime(dur), 0);
+  check("acc(0)",     traj.getAccelerationAtTime(0), 200);
+  check("acc(end)",   traj.getAccelerationAtTime(dur), 0);
+}
+
+// Negative exit accel: v0=0, a0=0, v1=0, a1=-200
+// Decel ramp must end with a = -200
+void test_negative_exit_accel() {
+  printf("test_negative_exit_accel\n");
+  ConstantJerkTrajectoryGenerator traj;
+  traj.plan(0, 0, 0, -200, 500, 8000, 35, 31);
+  float dur = traj.getTotalDuration();
+
+  check("duration>0", dur > 0 ? 1 : 0, 1);
+  check("pos(end)",   traj.getDistanceAtTime(dur), 35);
+  check("vel(0)",     traj.getVelocityAtTime(0), 0);
+  check("vel(end)",   traj.getVelocityAtTime(dur), 0);
+  check("acc(0)",     traj.getAccelerationAtTime(0), 0);
+  check("acc(end)",   traj.getAccelerationAtTime(dur), -200);
+}
+
+// Negative entry accel: entering while decelerating
+// v0=15, a0=-300, v1=0, a1=0
+void test_negative_entry_accel() {
+  printf("test_negative_entry_accel\n");
+  ConstantJerkTrajectoryGenerator traj;
+  traj.plan(15, -300, 0, 0, 500, 8000, 35, 31);
+  float dur = traj.getTotalDuration();
+
+  check("duration>0", dur > 0 ? 1 : 0, 1);
+  check("pos(end)",   traj.getDistanceAtTime(dur), 35);
+  check("vel(0)",     traj.getVelocityAtTime(0), 15);
+  check("vel(end)",   traj.getVelocityAtTime(dur), 0);
+  check("acc(0)",     traj.getAccelerationAtTime(0), -300);
+  check("acc(end)",   traj.getAccelerationAtTime(dur), 0);
+}
+
+// Both nonzero: v0=5, a0=100, v1=5, a1=-100
+void test_both_nonzero_accel() {
+  printf("test_both_nonzero_accel\n");
+  ConstantJerkTrajectoryGenerator traj;
+  traj.plan(5, 100, 5, -100, 500, 8000, 35, 31);
+  float dur = traj.getTotalDuration();
+
+  check("duration>0", dur > 0 ? 1 : 0, 1);
+  check("pos(end)",   traj.getDistanceAtTime(dur), 35);
+  check("vel(0)",     traj.getVelocityAtTime(0), 5);
+  check("vel(end)",   traj.getVelocityAtTime(dur), 5);
+  check("acc(0)",     traj.getAccelerationAtTime(0), 100);
+  check("acc(end)",   traj.getAccelerationAtTime(dur), -100);
+}
+
+// Positive exit accel: handing off to next block while accelerating
+// v0=0, a0=0, v1=10, a1=200
+void test_positive_exit_accel() {
+  printf("test_positive_exit_accel\n");
+  ConstantJerkTrajectoryGenerator traj;
+  traj.plan(0, 0, 10, 200, 500, 8000, 35, 31);
+  float dur = traj.getTotalDuration();
+
+  check("duration>0", dur > 0 ? 1 : 0, 1);
+  check("pos(end)",   traj.getDistanceAtTime(dur), 35);
+  check("vel(0)",     traj.getVelocityAtTime(0), 0);
+  check("vel(end)",   traj.getVelocityAtTime(dur), 10);
+  check("acc(0)",     traj.getAccelerationAtTime(0), 0);
+  check("acc(end)",   traj.getAccelerationAtTime(dur), 200);
+}
+
 int main() {
   test_pure_cruise();
   test_rest_to_rest_with_cruise();
   test_rest_to_rest_no_cruise();
   test_rest_to_moving();
   test_moving_to_rest();
+  test_positive_entry_accel();
+  test_negative_exit_accel();
+  test_negative_entry_accel();
+  test_both_nonzero_accel();
+  test_positive_exit_accel();
 
   printf("\n%d passed, %d failed\n", tests_passed, tests_failed);
   return tests_failed > 0 ? 1 : 0;

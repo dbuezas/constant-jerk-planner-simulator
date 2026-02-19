@@ -110,9 +110,9 @@ public:
     reset();
 
     v0 = initial_speed_in;
-    a0 = initial_accel_in;
+    a0 = fmaxf(-accel_max_in, fminf(initial_accel_in, accel_max_in));
     v1 = final_speed_in;
-    a1 = final_accel_in;
+    a1 = fmaxf(-accel_max_in, fminf(final_accel_in, accel_max_in));
     a_max = accel_max_in;
     j = jerk_in;
     distance = distance_in;
@@ -121,79 +121,91 @@ public:
 
     const float v_nominal = fmaxf(0.0f, v_nominal_in);
 
-    // --- Case: a0=0, a1=0 ---
     // 3-phase accel ramp (v0 → v_peak) + cruise + 3-phase decel ramp (v_peak → v1)
 
-    // Compute durations for a 3-phase accel ramp: (v_start, 0) → (v_end, 0)
-    // Phases: [+j, 0, -j]. Returns distance consumed.
-    auto planAccel = [&](float v_start, float v_end,
-                         float &pa, float &pb, float &pc) -> float {
-      float dv = v_end - v_start;
-      if (dv <= 0.0f) { pa = pb = pc = 0; return 0; }
-      float dv_tri = a_max * a_max / j;
-      if (dv <= dv_tri) {
-        float a_peak = sqrtf(dv * j);
-        pa = pc = a_peak / j;
+    // Accel ramp: (v0, a0) → (v_peak, 0), phases [+j, 0, -j]
+    // a_up = peak accel during ramp. t1=(a_up-a0)/j, t3=a_up/j
+    // Triangle: a_up = sqrt(j*Δv + 0.5*a0²)
+    // Trapezoidal: a_up = a_max, t2 fills remaining Δv
+    auto planAccel = [&](float v_peak, float &pa, float &pb, float &pc) -> float {
+      float dv = v_peak - v0;
+      float a_up_sq = j * dv + 0.5f * a0 * a0;
+      if (a_up_sq < 0) { pa = pb = pc = 0; return 0; }
+      float a_up = sqrtf(a_up_sq);
+
+      if (a_up <= a_max) {
+        pa = fmaxf(0.0f, (a_up - a0) / j);
         pb = 0;
+        pc = a_up / j;
       } else {
-        pa = pc = a_max / j;
-        pb = (dv - dv_tri) / a_max;
+        pa = fmaxf(0.0f, (a_max - a0) / j);
+        pc = a_max / j;
+        float dv_no_hold = (a_max * a_max - 0.5f * a0 * a0) / j;
+        pb = fmaxf(0.0f, (dv - dv_no_hold) / a_max);
       }
-      float v = v_start, a = 0.0f, s = 0.0f;
-      simulatePhase( j, pa, v, a, s);
-      simulatePhase( 0, pb, v, a, s);
-      simulatePhase(-j, pc, v, a, s);
+
+      float v = v0, a_v = a0, s = 0;
+      simulatePhase( j, pa, v, a_v, s);
+      simulatePhase( 0, pb, v, a_v, s);
+      simulatePhase(-j, pc, v, a_v, s);
       return s;
     };
 
-    // Compute durations for a 3-phase decel ramp: (v_start, 0) → (v_end, 0)
-    // Phases: [-j, 0, +j]. Returns distance consumed.
-    auto planDecel = [&](float v_start, float v_end,
-                         float &pa, float &pb, float &pc) -> float {
-      float dv = v_start - v_end;
-      if (dv <= 0.0f) { pa = pb = pc = 0; return 0; }
-      float dv_tri = a_max * a_max / j;
-      if (dv <= dv_tri) {
-        float a_peak = sqrtf(dv * j);
-        pa = pc = a_peak / j;
+    // Decel ramp: (v_peak, 0) → (v1, a1), phases [-j, 0, +j]
+    // |a_dn| = peak decel magnitude. t5=|a_dn|/j, t7=(a1+|a_dn|)/j
+    // Triangle: |a_dn| = sqrt(j*Δv + 0.5*a1²)
+    // Trapezoidal: |a_dn| = a_max, t6 fills remaining Δv
+    auto planDecel = [&](float v_peak, float &pa, float &pb, float &pc) -> float {
+      float dv = v_peak - v1;
+      float a_dn_abs_sq = j * dv + 0.5f * a1 * a1;
+      if (a_dn_abs_sq < 0) { pa = pb = pc = 0; return 0; }
+      float a_dn_abs = sqrtf(a_dn_abs_sq);
+
+      if (a_dn_abs <= a_max) {
+        pa = a_dn_abs / j;
         pb = 0;
+        pc = fmaxf(0.0f, (a_dn_abs + a1) / j);
       } else {
-        pa = pc = a_max / j;
-        pb = (dv - dv_tri) / a_max;
+        pa = a_max / j;
+        pc = fmaxf(0.0f, (a_max + a1) / j);
+        float dv_no_hold = (a_max * a_max - 0.5f * a1 * a1) / j;
+        pb = fmaxf(0.0f, (dv - dv_no_hold) / a_max);
       }
-      float v = v_start, a = 0.0f, s = 0.0f;
-      simulatePhase(-j, pa, v, a, s);
-      simulatePhase( 0, pb, v, a, s);
-      simulatePhase( j, pc, v, a, s);
+
+      float v = v_peak, a_v = 0, s = 0;
+      simulatePhase(-j, pa, v, a_v, s);
+      simulatePhase( 0, pb, v, a_v, s);
+      simulatePhase( j, pc, v, a_v, s);
       return s;
     };
 
-    auto totalRampDist = [&](float v_peak) -> float {
-      float a1, b1, c1, a2, b2, c2;
-      return planAccel(v0, v_peak, a1, b1, c1)
-           + planDecel(v_peak, v1, a2, b2, c2);
+    auto totalRampDist = [&](float vp) -> float {
+      float a, b, c;
+      return planAccel(vp, a, b, c) + planDecel(vp, a, b, c);
     };
 
-    float v_peak = v_nominal;
+    // Minimum feasible v_peak from each ramp constraint
+    float v_min_accel = (a0 >= 0) ? v0 + 0.5f*a0*a0/j : v0 - 0.5f*a0*a0/j;
+    float v_min_decel = (a1 <= 0) ? v1 + 0.5f*a1*a1/j : v1 - 0.5f*a1*a1/j;
+    float v_lo = fmaxf(0.0f, fmaxf(v_min_accel, v_min_decel));
+
+    float v_peak = fmaxf(v_lo, v_nominal);
     float s_ramps = totalRampDist(v_peak);
 
     if (s_ramps > distance) {
-      // v_nominal doesn't fit — binary search for v_peak
-      float lo = fmaxf(v0, v1);
+      // v_peak doesn't fit — binary search
       float hi = v_peak;
-      if (totalRampDist(lo) > distance) return; // can't fit even minimum ramps
+      if (totalRampDist(v_lo) > distance) return;
       for (int i = 0; i < 48; i++) {
-        float mid = 0.5f * (lo + hi);
-        if (totalRampDist(mid) > distance) hi = mid; else lo = mid;
+        float mid = 0.5f * (v_lo + hi);
+        if (totalRampDist(mid) > distance) hi = mid; else v_lo = mid;
       }
-      v_peak = lo;
+      v_peak = v_lo;
     }
 
-    // Set phase durations
-    planAccel(v0, v_peak, t1, t2, t3);
-    float s_accel = 0; { float v=v0, a=0, s=0; simulatePhase(j,t1,v,a,s); simulatePhase(0,t2,v,a,s); simulatePhase(-j,t3,v,a,s); s_accel=s; }
-    planDecel(v_peak, v1, t5, t6, t7);
-    float s_decel = 0; { float v=v_peak, a=0, s=0; simulatePhase(-j,t5,v,a,s); simulatePhase(0,t6,v,a,s); simulatePhase(j,t7,v,a,s); s_decel=s; }
+    // Set phase durations and compute ramp distances
+    float s_accel = planAccel(v_peak, t1, t2, t3);
+    float s_decel = planDecel(v_peak, t5, t6, t7);
 
     // Cruise phase
     s_ramps = s_accel + s_decel;
