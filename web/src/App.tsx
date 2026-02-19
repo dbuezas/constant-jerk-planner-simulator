@@ -5,7 +5,7 @@ import { planAndSample, type TrajectorySample } from './wasm/planner_wasm_loader
 const DEFAULTS = {
   entryV: 0,
   exitV: 0,
-  nominal: 31,
+  nominal: 100,
   maxEntry: 10,
   distance: 35,
   aMax: 500,
