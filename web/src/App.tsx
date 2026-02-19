@@ -154,7 +154,7 @@ function App() {
               value={inputs.entryV}
               min={0}
               max={200}
-              step={10}
+              step={1}
               onChange={(event) => setInputs({ ...inputs, entryV: Number(event.target.value) })}
             />
           </div>
@@ -167,7 +167,7 @@ function App() {
               value={inputs.exitV}
               min={0}
               max={200}
-              step={10}
+              step={1}
               onChange={(event) => setInputs({ ...inputs, exitV: Number(event.target.value) })}
             />
           </div>
@@ -180,7 +180,7 @@ function App() {
               value={inputs.nominal}
               min={1}
               max={200}
-              step={10}
+              step={1}
               onChange={(event) => setInputs({ ...inputs, nominal: Number(event.target.value) })}
             />
           </div>
@@ -193,7 +193,7 @@ function App() {
               value={inputs.maxEntry}
               min={0}
               max={200}
-              step={10}
+              step={1}
               onChange={(event) => setInputs({ ...inputs, maxEntry: Number(event.target.value) })}
             />
           </div>
@@ -206,7 +206,7 @@ function App() {
               value={inputs.distance}
               min={0}
               max={200}
-              step={10}
+              step={1}
               onChange={(event) => setInputs({ ...inputs, distance: Number(event.target.value) })}
             />
           </div>
@@ -219,7 +219,7 @@ function App() {
               value={inputs.aMax}
               min={0}
               max={2000}
-              step={10}
+              step={1}
               onChange={(event) => setInputs({ ...inputs, aMax: Number(event.target.value) })}
             />
           </div>
