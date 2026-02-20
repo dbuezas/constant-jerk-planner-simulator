@@ -46,6 +46,59 @@
  *         +- YES -> full S: [-jerk, cruise_decel, +jerk]
  *         +- NO  -> triangle: [-jerk, +jerk] (phase 6 = 0)
  */
+
+static inline void simulatePhase(float jerk, float dt, float& v, float& a, float& s) {
+  if (dt <= 0.0f) return;
+  s += v * dt + 0.5f * a * dt * dt + (1.0f / 6.0f) * jerk * dt * dt * dt;
+  v += a * dt + 0.5f * jerk * dt * dt;
+  a += jerk * dt;
+}
+
+// Plan a 3-phase ramp between v_start and v_peak.
+// Returns the distance consumed. pa/pb/pc are the phase durations.
+// Accel (decel=false): [+j, 0, -j] from v_start to v_peak.
+// Decel (decel=true):  [-j, 0, +j] from v_peak to v_start.
+static inline float planRamp(float v_start, float v_peak, float j, float a_max,
+                      bool decel, float& pa, float& pb, float& pc) {
+  float dv = v_peak - v_start;
+  float a_peak_sq = j * dv;
+  if (a_peak_sq < 0) {
+    pa = pb = pc = 0;
+    return 0;
+  }
+  float a_peak = sqrtf(a_peak_sq);
+
+  if (a_peak <= a_max) {
+    pa = a_peak / j;
+    pb = 0;
+    pc = a_peak / j;
+  } else {
+    pa = a_max / j;
+    pc = a_max / j;
+    float dv_no_hold = (a_max * a_max) / j;
+    pb = fmaxf(0.0f, (dv - dv_no_hold) / a_max);
+  }
+
+  float jk = decel ? -j : j;
+  float v = decel ? v_peak : v_start;
+  float a_v = 0, s = 0;
+  simulatePhase(jk, pa, v, a_v, s);
+  simulatePhase(0, pb, v, a_v, s);
+  simulatePhase(-jk, pc, v, a_v, s);
+  return s;
+}
+
+// Symmetric total ramp distance: always compute with (v_small, v_large)
+// so the binary search produces identical float results regardless of
+// whether v0 < v1 or v0 > v1.
+static inline float totalRampDist(float vp, float v_small, float v_large,
+                                  float j, float a_max) {
+  float a, b, c;
+  float s1 = planRamp(v_small, vp, j, a_max, false, a, b, c);
+  float s2 = planRamp(v_large, vp, j, a_max, true, a, b, c);
+  return s1 + s2;
+}
+
 class ConstantJerkTrajectoryGenerator {
  public:
   ConstantJerkTrajectoryGenerator() = default;
@@ -77,89 +130,25 @@ class ConstantJerkTrajectoryGenerator {
 
     const float v_nominal = fmaxf(0.0f, v_nominal_in);
 
-    // 3-phase accel ramp (v0 -> v_peak) + cruise + 3-phase decel ramp (v_peak -> v1)
-
-    // Accel ramp: v0 -> v_peak, phases [+j, 0, -j]
-    // Triangle: a_up = sqrt(j * dv)
-    // Trapezoidal: a_up = a_max, t2 fills remaining dv
-    auto planAccel = [&](float v_peak, float& pa, float& pb, float& pc) -> float {
-      float dv = v_peak - v0;
-      float a_up_sq = j * dv;
-      if (a_up_sq < 0) {
-        pa = pb = pc = 0;
-        return 0;
-      }
-      float a_up = sqrtf(a_up_sq);
-
-      if (a_up <= a_max) {
-        pa = a_up / j;
-        pb = 0;
-        pc = a_up / j;
-      } else {
-        pa = a_max / j;
-        pc = a_max / j;
-        float dv_no_hold = (a_max * a_max) / j;
-        pb = fmaxf(0.0f, (dv - dv_no_hold) / a_max);
-      }
-
-      float v = v0, a_v = 0, s = 0;
-      simulatePhase(j, pa, v, a_v, s);
-      simulatePhase(0, pb, v, a_v, s);
-      simulatePhase(-j, pc, v, a_v, s);
-      return s;
-    };
-
-    // Decel ramp: v_peak -> v1, phases [-j, 0, +j]
-    // Triangle: a_dn = sqrt(j * dv)
-    // Trapezoidal: a_dn = a_max, t6 fills remaining dv
-    auto planDecel = [&](float v_peak, float& pa, float& pb, float& pc) -> float {
-      float dv = v_peak - v1;
-      float a_dn_abs_sq = j * dv;
-      if (a_dn_abs_sq < 0) {
-        pa = pb = pc = 0;
-        return 0;
-      }
-      float a_dn_abs = sqrtf(a_dn_abs_sq);
-
-      if (a_dn_abs <= a_max) {
-        pa = a_dn_abs / j;
-        pb = 0;
-        pc = a_dn_abs / j;
-      } else {
-        pa = a_max / j;
-        pc = a_max / j;
-        float dv_no_hold = (a_max * a_max) / j;
-        pb = fmaxf(0.0f, (dv - dv_no_hold) / a_max);
-      }
-
-      float v = v_peak, a_v = 0, s = 0;
-      simulatePhase(-j, pa, v, a_v, s);
-      simulatePhase(0, pb, v, a_v, s);
-      simulatePhase(j, pc, v, a_v, s);
-      return s;
-    };
-
-    auto totalRampDist = [&](float vp) -> float {
-      float a, b, c;
-      return planAccel(vp, a, b, c) + planDecel(vp, a, b, c);
-    };
+    float v_small = fminf(v0, v1);
+    float v_large = fmaxf(v0, v1);
 
     // Minimum feasible v_peak: must be >= both v0 and v1
-    float v_lo = fmaxf(0.0f, fmaxf(v0, v1));
+    float v_lo = fmaxf(0.0f, v_large);
 
     float v_peak = fmaxf(v_lo, v_nominal);
-    float s_ramps = totalRampDist(v_peak);
+    float s_ramps = totalRampDist(v_peak, v_small, v_large, j, a_max);
 
     if (s_ramps > distance) {
       // v_peak doesn't fit -- binary search until undershoot < tolerance
       float hi = v_peak;
-      if (totalRampDist(v_lo) > distance) {
+      if (totalRampDist(v_lo, v_small, v_large, j, a_max) > distance) {
         CJP_SET_STATUS("minimum ramp distance exceeds block distance");
         return;
       }
       for (int i = 0; i < 48; i++) {
         float mid = 0.5f * (v_lo + hi);
-        float s_mid = totalRampDist(mid);
+        float s_mid = totalRampDist(mid, v_small, v_large, j, a_max);
         if (s_mid > distance)
           hi = mid;
         else
@@ -169,9 +158,9 @@ class ConstantJerkTrajectoryGenerator {
       v_peak = v_lo;
     }
 
-    // Set phase durations and compute ramp distances
-    float s_accel = planAccel(v_peak, t1, t2, t3);
-    float s_decel = planDecel(v_peak, t5, t6, t7);
+    // Set phase durations with actual v0/v1 order
+    float s_accel = planRamp(v0, v_peak, j, a_max, false, t1, t2, t3);
+    float s_decel = planRamp(v1, v_peak, j, a_max, true, t5, t6, t7);
 
     // Cruise phase absorbs any remaining distance
     s_ramps = s_accel + s_decel;
@@ -237,13 +226,6 @@ class ConstantJerkTrajectoryGenerator {
   }
 
  private:
-  static void simulatePhase(float jerk, float dt, float& v, float& a, float& s) {
-    if (dt <= 0.0f) return;
-    s += v * dt + 0.5f * a * dt * dt + (1.0f / 6.0f) * jerk * dt * dt * dt;
-    v += a * dt + 0.5f * jerk * dt * dt;
-    a += jerk * dt;
-  }
-
   void buildPhaseCache() {
     phase_dt[0] = t1;
     phase_dt[1] = t2;

@@ -1,8 +1,9 @@
 #include "constant-jerk-planner.h"
-#include "trajectory_constant_jerk.h"
 
 #include <math.h>
 #include <string.h>
+
+#include "trajectory_constant_jerk.h"
 
 namespace {
 
@@ -16,6 +17,8 @@ struct Block {
   float entry_v;
   float exit_v;
 };
+
+#define CJP_BLOCK_BUFFER_SIZE 32
 
 struct Planner {
   Block buf[CJP_BLOCK_BUFFER_SIZE];
@@ -58,7 +61,7 @@ struct Planner {
 // starting from v_from with a=0, ending with a=0.
 // Uses ConstantJerkTrajectoryGenerator as a feasibility oracle.
 static float max_reachable_speed(float v_from, float mm,
-                                  float nominal, float a_max, float j_max) {
+                                 float nominal, float a_max, float j_max) {
   if (mm <= 0.0f) return v_from;
 
   ConstantJerkTrajectoryGenerator traj;
@@ -134,7 +137,7 @@ int cjp_recalculate(void) {
     // Due to time-reversibility with a=0 boundaries, this equals
     // max_reachable_speed(required_exit, mm, ...).
     float max_from_exit = max_reachable_speed(required_exit, b->millimeters,
-                                               b->nominal, b->a_max, b->j_max);
+                                              b->nominal, b->a_max, b->j_max);
     b->entry_v = fminf(cap, max_from_exit);
   }
 
@@ -147,7 +150,7 @@ int cjp_recalculate(void) {
     Block* curr = planner.at(i);
 
     float max_from_prev = max_reachable_speed(prev->entry_v, prev->millimeters,
-                                               prev->nominal, prev->a_max, prev->j_max);
+                                              prev->nominal, prev->a_max, prev->j_max);
     float cap = fminf(curr->nominal, curr->max_entry_speed);
     float forward_limit = fminf(cap, max_from_prev);
 
