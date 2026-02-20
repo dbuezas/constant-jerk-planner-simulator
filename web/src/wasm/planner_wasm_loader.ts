@@ -25,9 +25,7 @@ export async function loadPlannerWasm(): Promise<EmscriptenModule> {
 
 export type TrajectoryPlanInput = {
   entryV: number;
-  entryA: number;
   exitV: number;
-  exitA: number;
   aMax: number;
   jMax: number;
   distance: number;
@@ -47,9 +45,7 @@ export type MultiBlockResult = {
   blocks: Array<{
     input: BlockDefinition;
     entryV: number;
-    entryA: number;
     exitV: number;
-    exitA: number;
   }>;
   trajectory: {
     times: number[];
@@ -79,9 +75,7 @@ export type TrajectorySample = {
     aMax: number;
     jMax: number;
     entryV: number;
-    entryA: number;
     exitV: number;
-    exitA: number;
   } | null;
 };
 
@@ -90,7 +84,7 @@ function readBlock(
   ptr: number
 ): TrajectorySample["block"] {
   const base = ptr / 4;
-  const buf = mod.HEAPF32.subarray(base, base + 9);
+  const buf = mod.HEAPF32.subarray(base, base + 7);
   return {
     millimeters: buf[0],
     maxEntrySpeed: buf[1],
@@ -98,9 +92,7 @@ function readBlock(
     aMax: buf[3],
     jMax: buf[4],
     entryV: buf[5],
-    entryA: buf[6],
-    exitV: buf[7],
-    exitA: buf[8],
+    exitV: buf[6],
   };
 }
 
@@ -110,18 +102,8 @@ export async function planAndSample(
 ): Promise<TrajectorySample> {
   const mod = await loadPlannerWasm();
 
-  const planBlock = mod.cwrap("cjp_plan_single_block", "number", [
-    "number",
-    "number",
-    "number",
-    "number",
-    "number",
-  ]);
-  const getBlock = mod.cwrap("cjp_get_first_block", "number", ["number"]);
   const reset = mod.cwrap("cjp_traj_reset", null, []);
   const plan = mod.cwrap("cjp_traj_plan", "number", [
-    "number",
-    "number",
     "number",
     "number",
     "number",
@@ -140,32 +122,18 @@ export async function planAndSample(
     "string",
     []
   ) as unknown as () => string;
-  const malloc = mod.cwrap("malloc", "number", ["number"]);
-  const free = mod.cwrap("free", null, ["number"]);
 
-  const ptr = malloc(9 * 4);
-  let block: TrajectorySample["block"] = null;
-  // try {
-  //   const okBlock = planBlock(input.distance, input.maxEntry, input.nominal, input.aMax, input.jMax)
-  //   if (okBlock) {
-  //     const got = getBlock(ptr)
-  //     if (got) block = readBlock(mod, ptr)
-  //   }
-  // } finally {
-  //   free(ptr)
-  // }
+  const block: TrajectorySample["block"] = null;
 
   const entryV = input.entryV;
-  const entryA = block?.entryA ?? input.entryA;
   const exitV = input.exitV;
-  const exitA = block?.exitA ?? input.exitA;
-  const aMax = block?.aMax ?? input.aMax;
-  const jMax = block?.jMax ?? input.jMax;
-  const distance = block?.millimeters ?? input.distance;
+  const aMax = input.aMax;
+  const jMax = input.jMax;
+  const distance = input.distance;
   const nominal = input.nominal;
 
   reset();
-  const ok = plan(entryV, entryA, exitV, exitA, aMax, jMax, distance, nominal);
+  const ok = plan(entryV, exitV, aMax, jMax, distance, nominal);
   const ptime = planTimeUs();
   const pstatus = trajStatus();
   if (!ok) {
@@ -286,7 +254,7 @@ export async function planMultiBlock(
   let cumulativeTime = 0;
   let cumulativePos = 0;
 
-  const ptr = mallocFn(9 * 4);
+  const ptr = mallocFn(7 * 4);
 
   try {
     for (let i = 0; i < blocks.length; i++) {
@@ -297,9 +265,7 @@ export async function planMultiBlock(
         resultBlocks.push({
           input: blocks[i],
           entryV: bd!.entryV,
-          entryA: bd!.entryA,
           exitV: bd!.exitV,
-          exitA: bd!.exitA,
         });
       }
 

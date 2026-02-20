@@ -14,20 +14,18 @@ int cjp_plan_single_block(float mm, float max_entry_speed, float nominal, float 
   return cjp_recalculate();
 }
 
-int cjp_get_first_block(float *out9) {
-  if (!out9 || cjp_size() == 0) return 0;
+int cjp_get_first_block(float *out7) {
+  if (!out7 || cjp_size() == 0) return 0;
   CJP_BlockOut out;
   const int ok = cjp_get_block(0, &out);
   if (!ok) return 0;
-  out9[0] = out.millimeters;
-  out9[1] = out.max_entry_speed;
-  out9[2] = out.nominal;
-  out9[3] = out.a_max;
-  out9[4] = out.j_max;
-  out9[5] = out.entry_v;
-  out9[6] = out.entry_a;
-  out9[7] = out.exit_v;
-  out9[8] = out.exit_a;
+  out7[0] = out.millimeters;
+  out7[1] = out.max_entry_speed;
+  out7[2] = out.nominal;
+  out7[3] = out.a_max;
+  out7[4] = out.j_max;
+  out7[5] = out.entry_v;
+  out7[6] = out.exit_v;
   return 1;
 }
 
@@ -35,13 +33,13 @@ void cjp_traj_reset(void) {
   g_traj.reset();
 }
 
-int cjp_traj_plan(float entry_v, float entry_a, float exit_v, float exit_a,
+int cjp_traj_plan(float entry_v, float exit_v,
                   float a_max, float j_max, float mm, float nominal) {
   auto start = std::chrono::high_resolution_clock::now();
   int n = 0;
   float elapsed_us;
   do {
-    g_traj.plan(entry_v, entry_a, exit_v, exit_a, a_max, j_max, mm, nominal);
+    g_traj.plan(entry_v, exit_v, a_max, j_max, mm, nominal);
     n++;
     elapsed_us = std::chrono::duration<float, std::micro>(
         std::chrono::high_resolution_clock::now() - start).count();
@@ -82,26 +80,23 @@ int cjp_plan_block_trajectory(int index) {
   CJP_BlockOut block;
   if (!cjp_get_block((size_t)index, &block)) return 0;
 
-  g_traj.plan(block.entry_v, block.entry_a,
-              block.exit_v, block.exit_a,
+  g_traj.plan(block.entry_v, block.exit_v,
               block.a_max, block.j_max,
               block.millimeters, block.nominal);
 
   return g_traj.getTotalDuration() > 0.0f ? 1 : 0;
 }
 
-int cjp_get_block_data(int index, float *out9) {
-  if (!out9) return 0;
+int cjp_get_block_data(int index, float *out7) {
+  if (!out7) return 0;
   CJP_BlockOut block;
   if (!cjp_get_block((size_t)index, &block)) return 0;
-  out9[0] = block.millimeters;
-  out9[1] = block.max_entry_speed;
-  out9[2] = block.nominal;
-  out9[3] = block.a_max;
-  out9[4] = block.j_max;
-  out9[5] = block.entry_v;
-  out9[6] = block.entry_a;
-  out9[7] = block.exit_v;
-  out9[8] = block.exit_a;
+  out7[0] = block.millimeters;
+  out7[1] = block.max_entry_speed;
+  out7[2] = block.nominal;
+  out7[3] = block.a_max;
+  out7[4] = block.j_max;
+  out7[5] = block.entry_v;
+  out7[6] = block.exit_v;
   return 1;
 }

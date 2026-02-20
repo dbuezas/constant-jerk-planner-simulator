@@ -69,13 +69,13 @@ static float max_reachable_speed(float v_from, float mm,
   float lo = 0.0f;
 
   // Quick check: can we reach hi?
-  traj.plan(v_from, 0, hi, 0, a_max, j_max, mm, nominal);
+  traj.plan(v_from, hi, a_max, j_max, mm, nominal);
   if (traj.getTotalDuration() > 0) return hi;
 
   // Binary search for max feasible exit speed
   for (int i = 0; i < 32; i++) {
     float mid = 0.5f * (lo + hi);
-    traj.plan(v_from, 0, mid, 0, a_max, j_max, mm, nominal);
+    traj.plan(v_from, mid, a_max, j_max, mm, nominal);
     if (traj.getTotalDuration() > 0)
       lo = mid;
     else
@@ -179,9 +179,7 @@ int cjp_get_block(size_t index, CJP_BlockOut* out) {
   out->a_max = b->a_max;
   out->j_max = b->j_max;
   out->entry_v = b->entry_v;
-  out->entry_a = 0.0f;
   out->exit_v = b->exit_v;
-  out->exit_a = 0.0f;
 
   return 1;
 }

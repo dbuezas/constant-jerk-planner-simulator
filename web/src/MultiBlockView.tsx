@@ -206,9 +206,7 @@ export default function MultiBlockView() {
                     <th className="px-2 py-1">a_max</th>
                     <th className="px-2 py-1">j_max</th>
                     <th className="px-2 py-1">Entry V</th>
-                    <th className="px-2 py-1">Entry A</th>
                     <th className="px-2 py-1">Exit V</th>
-                    <th className="px-2 py-1">Exit A</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -227,13 +225,7 @@ export default function MultiBlockView() {
                         {format(b.entryV, 2)}
                       </td>
                       <td className="px-2 py-1 text-orange-300">
-                        {format(b.entryA, 2)}
-                      </td>
-                      <td className="px-2 py-1 text-orange-300">
                         {format(b.exitV, 2)}
-                      </td>
-                      <td className="px-2 py-1 text-orange-300">
-                        {format(b.exitA, 2)}
                       </td>
                     </tr>
                   ))}

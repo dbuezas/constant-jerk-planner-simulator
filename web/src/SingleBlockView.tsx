@@ -6,8 +6,6 @@ import { type TrajectorySample, planAndSample } from "./wasm/planner_wasm_loader
 const DEFAULTS = {
   entryV: 0,
   exitV: 0,
-  entryA: 0,
-  exitA: 0,
   nominal: 100,
   maxEntry: 10,
   distance: 35,
@@ -28,8 +26,6 @@ function lerpInputs(from: InputState, to: InputState, t: number): InputState {
   return {
     entryV: lerp(from.entryV, to.entryV, t),
     exitV: lerp(from.exitV, to.exitV, t),
-    entryA: lerp(from.entryA, to.entryA, t),
-    exitA: lerp(from.exitA, to.exitA, t),
     nominal: lerp(from.nominal, to.nominal, t),
     maxEntry: lerp(from.maxEntry, to.maxEntry, t),
     distance: lerp(from.distance, to.distance, t),
@@ -74,15 +70,6 @@ export default function SingleBlockView() {
       } else if (key === "nominal") {
         next.entryV = Math.min(next.entryV, next.nominal);
         next.exitV = Math.min(next.exitV, next.nominal);
-      } else if (key === "entryA" || key === "exitA") {
-        next.aMax = Math.max(
-          next.aMax,
-          Math.abs(next.entryA),
-          Math.abs(next.exitA)
-        );
-      } else if (key === "aMax") {
-        next.entryA = Math.max(-next.aMax, Math.min(next.aMax, next.entryA));
-        next.exitA = Math.max(-next.aMax, Math.min(next.aMax, next.exitA));
       }
       return next;
     });
@@ -206,9 +193,7 @@ export default function SingleBlockView() {
       const sample = await planAndSample(
         {
           entryV: planInputs.entryV,
-          entryA: planInputs.entryA,
           exitV: planInputs.exitV,
-          exitA: planInputs.exitA,
           aMax: planInputs.aMax,
           jMax: planInputs.jMax,
           distance: planInputs.distance,
@@ -273,20 +258,6 @@ export default function SingleBlockView() {
             />
           </div>
           <div className="grid gap-1.5 text-left">
-            <label className="text-sm text-[#b8b8b8]" htmlFor="entryA">
-              Entry acceleration (mm/s²)
-            </label>
-            <input
-              className="rounded-md border border-[#333] bg-[#111] px-2 py-2 text-white"
-              id="entryA"
-              type="number"
-              value={inputs.entryA}
-              step={10}
-              onChange={(e) => updateInput("entryA", Number(e.target.value))}
-              onKeyDown={(e) => handleShiftStep(e, "entryA")}
-            />
-          </div>
-          <div className="grid gap-1.5 text-left">
             <label className="text-sm text-[#b8b8b8]" htmlFor="nominal">
               Nominal velocity (mm/s)
             </label>
@@ -314,20 +285,6 @@ export default function SingleBlockView() {
               step={1}
               onChange={(e) => updateInput("exitV", Number(e.target.value))}
               onKeyDown={(e) => handleShiftStep(e, "exitV")}
-            />
-          </div>
-          <div className="grid gap-1.5 text-left">
-            <label className="text-sm text-[#b8b8b8]" htmlFor="exitA">
-              Exit acceleration (mm/s²)
-            </label>
-            <input
-              className="rounded-md border border-[#333] bg-[#111] px-2 py-2 text-white"
-              id="exitA"
-              type="number"
-              value={inputs.exitA}
-              step={10}
-              onChange={(e) => updateInput("exitA", Number(e.target.value))}
-              onKeyDown={(e) => handleShiftStep(e, "exitA")}
             />
           </div>
           <div className="grid gap-1.5 text-left">

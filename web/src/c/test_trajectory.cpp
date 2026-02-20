@@ -15,12 +15,12 @@ static void check(const char *name, float actual, float expected, float tol = 1e
 }
 
 // Simplest case: pure cruise
-// v0 = v1 = nominal, a0 = a1 = 0, just constant velocity
+// v0 = v1 = nominal, just constant velocity
 void test_pure_cruise() {
   printf("test_pure_cruise\n");
   ConstantJerkTrajectoryGenerator traj;
-  // entry_v=10, entry_a=0, exit_v=10, exit_a=0, a_max=500, j_max=8000, dist=35, nominal=10
-  traj.plan(10, 0, 10, 0, 500, 8000, 35, 10);
+  // entry_v=10, exit_v=10, a_max=500, j_max=8000, dist=35, nominal=10
+  traj.plan(10, 10, 500, 8000, 35, 10);
 
   check("duration", traj.getTotalDuration(), 3.5f);       // 35 / 10 = 3.5s
   check("pos(0)",   traj.getDistanceAtTime(0.0f), 0.0f);
@@ -34,11 +34,11 @@ void test_pure_cruise() {
 }
 
 // From rest to rest, with cruise phase
-// v0=0, v1=0, a0=0, a1=0, nominal=31, a_max=500, j=8000, dist=35
+// v0=0, v1=0, nominal=31, a_max=500, j=8000, dist=35
 void test_rest_to_rest_with_cruise() {
   printf("test_rest_to_rest_with_cruise\n");
   ConstantJerkTrajectoryGenerator traj;
-  traj.plan(0, 0, 0, 0, 500, 8000, 35, 31);
+  traj.plan(0, 0, 500, 8000, 35, 31);
   float dur = traj.getTotalDuration();
 
   check("duration>0",  dur > 0 ? 1 : 0, 1);
@@ -56,7 +56,7 @@ void test_rest_to_rest_with_cruise() {
 void test_rest_to_rest_no_cruise() {
   printf("test_rest_to_rest_no_cruise\n");
   ConstantJerkTrajectoryGenerator traj;
-  traj.plan(0, 0, 0, 0, 500, 8000, 2, 31);
+  traj.plan(0, 0, 500, 8000, 2, 31);
   float dur = traj.getTotalDuration();
 
   check("duration>0",  dur > 0 ? 1 : 0, 1);
@@ -71,11 +71,11 @@ void test_rest_to_rest_no_cruise() {
 }
 
 // Asymmetric: start at rest, exit at speed
-// v0=0, v1=15, a0=0, a1=0
+// v0=0, v1=15
 void test_rest_to_moving() {
   printf("test_rest_to_moving\n");
   ConstantJerkTrajectoryGenerator traj;
-  traj.plan(0, 0, 15, 0, 500, 8000, 35, 31);
+  traj.plan(0, 15, 500, 8000, 35, 31);
   float dur = traj.getTotalDuration();
 
   check("duration>0",  dur > 0 ? 1 : 0, 1);
@@ -88,7 +88,7 @@ void test_rest_to_moving() {
 void test_moving_to_rest() {
   printf("test_moving_to_rest\n");
   ConstantJerkTrajectoryGenerator traj;
-  traj.plan(20, 0, 0, 0, 500, 8000, 35, 31);
+  traj.plan(20, 0, 500, 8000, 35, 31);
   float dur = traj.getTotalDuration();
 
   check("duration>0",  dur > 0 ? 1 : 0, 1);
@@ -97,152 +97,12 @@ void test_moving_to_rest() {
   check("vel(end)",    traj.getVelocityAtTime(dur), 0);
 }
 
-// Positive entry accel: v0=0, a0=200, v1=0, a1=0
-// Must account for velocity gained while unwinding a0
-void test_positive_entry_accel() {
-  printf("test_positive_entry_accel\n");
-  ConstantJerkTrajectoryGenerator traj;
-  traj.plan(0, 200, 0, 0, 500, 8000, 35, 31);
-  float dur = traj.getTotalDuration();
-
-  check("duration>0", dur > 0 ? 1 : 0, 1);
-  check("pos(end)",   traj.getDistanceAtTime(dur), 35);
-  check("vel(0)",     traj.getVelocityAtTime(0), 0);
-  check("vel(end)",   traj.getVelocityAtTime(dur), 0);
-  check("acc(0)",     traj.getAccelerationAtTime(0), 200);
-  check("acc(end)",   traj.getAccelerationAtTime(dur), 0);
-}
-
-// Negative exit accel: v0=0, a0=0, v1=0, a1=-200
-// Decel ramp must end with a = -200
-void test_negative_exit_accel() {
-  printf("test_negative_exit_accel\n");
-  ConstantJerkTrajectoryGenerator traj;
-  traj.plan(0, 0, 0, -200, 500, 8000, 35, 31);
-  float dur = traj.getTotalDuration();
-
-  check("duration>0", dur > 0 ? 1 : 0, 1);
-  check("pos(end)",   traj.getDistanceAtTime(dur), 35);
-  check("vel(0)",     traj.getVelocityAtTime(0), 0);
-  check("vel(end)",   traj.getVelocityAtTime(dur), 0);
-  check("acc(0)",     traj.getAccelerationAtTime(0), 0);
-  check("acc(end)",   traj.getAccelerationAtTime(dur), -200);
-}
-
-// Negative entry accel: entering while decelerating
-// v0=15, a0=-300, v1=0, a1=0
-void test_negative_entry_accel() {
-  printf("test_negative_entry_accel\n");
-  ConstantJerkTrajectoryGenerator traj;
-  traj.plan(15, -300, 0, 0, 500, 8000, 35, 31);
-  float dur = traj.getTotalDuration();
-
-  check("duration>0", dur > 0 ? 1 : 0, 1);
-  check("pos(end)",   traj.getDistanceAtTime(dur), 35);
-  check("vel(0)",     traj.getVelocityAtTime(0), 15);
-  check("vel(end)",   traj.getVelocityAtTime(dur), 0);
-  check("acc(0)",     traj.getAccelerationAtTime(0), -300);
-  check("acc(end)",   traj.getAccelerationAtTime(dur), 0);
-}
-
-// Both nonzero: v0=5, a0=100, v1=5, a1=-100
-void test_both_nonzero_accel() {
-  printf("test_both_nonzero_accel\n");
-  ConstantJerkTrajectoryGenerator traj;
-  traj.plan(5, 100, 5, -100, 500, 8000, 35, 31);
-  float dur = traj.getTotalDuration();
-
-  check("duration>0", dur > 0 ? 1 : 0, 1);
-  check("pos(end)",   traj.getDistanceAtTime(dur), 35);
-  check("vel(0)",     traj.getVelocityAtTime(0), 5);
-  check("vel(end)",   traj.getVelocityAtTime(dur), 5);
-  check("acc(0)",     traj.getAccelerationAtTime(0), 100);
-  check("acc(end)",   traj.getAccelerationAtTime(dur), -100);
-}
-
-// Positive exit accel: handing off to next block while accelerating
-// v0=0, a0=0, v1=10, a1=200
-void test_positive_exit_accel() {
-  printf("test_positive_exit_accel\n");
-  ConstantJerkTrajectoryGenerator traj;
-  traj.plan(0, 0, 10, 200, 500, 8000, 35, 31);
-  float dur = traj.getTotalDuration();
-
-  check("duration>0", dur > 0 ? 1 : 0, 1);
-  check("pos(end)",   traj.getDistanceAtTime(dur), 35);
-  check("vel(0)",     traj.getVelocityAtTime(0), 0);
-  check("vel(end)",   traj.getVelocityAtTime(dur), 10);
-  check("acc(0)",     traj.getAccelerationAtTime(0), 0);
-  check("acc(end)",   traj.getAccelerationAtTime(dur), 200);
-}
-
-// Large positive exit accel, short distance: direct ramp needed
-// v0=0, a0=0, v1=100, a1=1000, nominal=100, distance=9, aMax=1200, jMax=8000
-// The standard v_peak approach fails because the forced a=0 intermediate
-// point wastes distance. A direct ramp (v0,a0)->(v1,a1) fits in ~5.4mm.
-void test_large_positive_exit_accel_short_distance() {
-  printf("test_large_positive_exit_accel_short_distance\n");
-  ConstantJerkTrajectoryGenerator traj;
-  traj.plan(0, 0, 100, 1000, 1200, 8000, 9, 100);
-  float dur = traj.getTotalDuration();
-
-  check("duration>0", dur > 0 ? 1 : 0, 1);
-  check("pos(end)",   traj.getDistanceAtTime(dur), 9, 0.1f);
-  check("vel(0)",     traj.getVelocityAtTime(0), 0);
-  check("vel(end)",   traj.getVelocityAtTime(dur), 100, 1.0f);
-  check("acc(0)",     traj.getAccelerationAtTime(0), 0);
-  check("acc(end)",   traj.getAccelerationAtTime(dur), 1000, 5.0f);
-  // Velocity should be non-negative throughout
-  if (dur > 0) {
-    float v_min = 1e9f;
-    float step = dur / 100;
-    for (float t = 0; t <= dur; t += step) {
-      float v = traj.getVelocityAtTime(t);
-      if (v < v_min) v_min = v;
-    }
-    check("vel>=0", v_min >= -0.01f ? 1 : 0, 1);
-  }
-}
-
-// Mirror of above: large negative entry accel, short distance
-// v0=100, a0=-1000, v1=0, a1=0, nominal=100, distance=9, aMax=1200, jMax=8000
-void test_large_negative_entry_accel_short_distance() {
-  printf("test_large_negative_entry_accel_short_distance\n");
-  ConstantJerkTrajectoryGenerator traj;
-  traj.plan(100, -1000, 0, 0, 1200, 8000, 9, 100);
-  float dur = traj.getTotalDuration();
-
-  check("duration>0", dur > 0 ? 1 : 0, 1);
-  check("pos(end)",   traj.getDistanceAtTime(dur), 9, 0.1f);
-  check("vel(0)",     traj.getVelocityAtTime(0), 100);
-  check("vel(end)",   traj.getVelocityAtTime(dur), 0, 1.0f);
-  check("acc(0)",     traj.getAccelerationAtTime(0), -1000);
-  check("acc(end)",   traj.getAccelerationAtTime(dur), 0, 5.0f);
-  // Velocity should be non-negative throughout
-  if (dur > 0) {
-    float v_min = 1e9f;
-    float step = dur / 100;
-    for (float t = 0; t <= dur; t += step) {
-      float v = traj.getVelocityAtTime(t);
-      if (v < v_min) v_min = v;
-    }
-    check("vel>=0", v_min >= -0.01f ? 1 : 0, 1);
-  }
-}
-
 int main() {
   test_pure_cruise();
   test_rest_to_rest_with_cruise();
   test_rest_to_rest_no_cruise();
   test_rest_to_moving();
   test_moving_to_rest();
-  test_positive_entry_accel();
-  test_negative_exit_accel();
-  test_negative_entry_accel();
-  test_both_nonzero_accel();
-  test_positive_exit_accel();
-  test_large_positive_exit_accel_short_distance();
-  test_large_negative_entry_accel_short_distance();
 
   printf("\n%d passed, %d failed\n", tests_passed, tests_failed);
   return tests_failed > 0 ? 1 : 0;
