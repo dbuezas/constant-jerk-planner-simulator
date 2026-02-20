@@ -57,6 +57,7 @@ export type MultiBlockResult = {
   };
   totalDuration: number;
   totalDistance: number;
+  mergedCount: number;
 };
 
 export type TrajectorySample = {
@@ -219,16 +220,15 @@ export async function planMultiBlock(
   const getBlockData = mod.cwrap("cjp_get_block_data", "number", [
     "number", "number",
   ]);
-  const planBlockTraj = mod.cwrap("cjp_plan_block_trajectory", "number", [
-    "number",
-  ]);
-  const trajDuration = mod.cwrap("cjp_traj_duration", "number", []);
-  const trajPosition = mod.cwrap("cjp_traj_position", "number", ["number"]);
-  const trajVelocity = mod.cwrap("cjp_traj_velocity", "number", ["number"]);
-  const trajAcceleration = mod.cwrap("cjp_traj_acceleration", "number", [
-    "number",
-  ]);
-  const trajJerk = mod.cwrap("cjp_traj_jerk", "number", ["number"]);
+  const mergedSize = mod.cwrap("cjp_merged_size", "number", []);
+  const execReset = mod.cwrap("cjp_exec_reset", null, []);
+  const execStep = mod.cwrap("cjp_exec_step", "number", ["number"]);
+  const execTime = mod.cwrap("cjp_exec_time", "number", []);
+  const execPosition = mod.cwrap("cjp_exec_position", "number", []);
+  const execVelocity = mod.cwrap("cjp_exec_velocity", "number", []);
+  const execAcceleration = mod.cwrap("cjp_exec_acceleration", "number", []);
+  const execJerk = mod.cwrap("cjp_exec_jerk", "number", []);
+  const execOrigBlock = mod.cwrap("cjp_exec_original_block", "number", []);
   const mallocFn = mod.cwrap("malloc", "number", ["number"]);
   const freeFn = mod.cwrap("free", null, ["number"]);
 
@@ -243,22 +243,13 @@ export async function planMultiBlock(
   const feasible = recalculate();
   if (!feasible) throw new Error("Multi-block plan is infeasible");
 
+  const mergedCount = mergedSize() as number;
+
+  // Read per-original-block data for the results table
   const resultBlocks: MultiBlockResult["blocks"] = [];
-  const allTimes: number[] = [];
-  const allPos: number[] = [];
-  const allVel: number[] = [];
-  const allAcc: number[] = [];
-  const allJrk: number[] = [];
-  const blockBoundaries: number[] = [];
-
-  let cumulativeTime = 0;
-  let cumulativePos = 0;
-
   const ptr = mallocFn(7 * 4);
-
   try {
     for (let i = 0; i < blocks.length; i++) {
-      // Read block data
       const gotBlock = getBlockData(i, ptr);
       if (gotBlock) {
         const bd = readBlock(mod, ptr);
@@ -268,42 +259,38 @@ export async function planMultiBlock(
           exitV: bd!.exitV,
         });
       }
-
-      // Plan trajectory for this block
-      const ok = planBlockTraj(i);
-      if (!ok) throw new Error(`Failed to plan trajectory for block ${i}`);
-
-      const dur = trajDuration();
-      blockBoundaries.push(cumulativeTime);
-
-      // Sample this block's trajectory
-      const maxSamples = Math.ceil(10000 / blocks.length);
-      const targetStep = dur / maxSamples;
-      const step = Math.max(dt, targetStep);
-
-      let t = 0;
-      while (t <= dur) {
-        allTimes.push(cumulativeTime + t);
-        allPos.push(cumulativePos + trajPosition(t));
-        allVel.push(trajVelocity(t));
-        allAcc.push(trajAcceleration(t));
-        allJrk.push(trajJerk(t));
-        t += step;
-      }
-      if (allTimes[allTimes.length - 1] < cumulativeTime + dur) {
-        allTimes.push(cumulativeTime + dur);
-        allPos.push(cumulativePos + trajPosition(dur));
-        allVel.push(trajVelocity(dur));
-        allAcc.push(trajAcceleration(dur));
-        allJrk.push(trajJerk(dur));
-      }
-
-      cumulativeTime += dur;
-      cumulativePos += trajPosition(dur);
     }
   } finally {
     freeFn(ptr);
   }
+
+  // Stream through the trajectory using exec API
+  const allTimes: number[] = [];
+  const allPos: number[] = [];
+  const allVel: number[] = [];
+  const allAcc: number[] = [];
+  const allJrk: number[] = [];
+  const blockBoundaries: number[] = [0];
+
+  let lastOrigBlock = 0;
+
+  execReset();
+  while (execStep(dt)) {
+    allTimes.push(execTime());
+    allPos.push(execPosition());
+    allVel.push(execVelocity());
+    allAcc.push(execAcceleration());
+    allJrk.push(execJerk());
+
+    const origBlock = execOrigBlock() as number;
+    if (origBlock !== lastOrigBlock) {
+      blockBoundaries.push(execTime());
+      lastOrigBlock = origBlock;
+    }
+  }
+
+  const totalDuration = allTimes.length > 0 ? allTimes[allTimes.length - 1] : 0;
+  const totalDistance = allPos.length > 0 ? allPos[allPos.length - 1] : 0;
 
   return {
     blocks: resultBlocks,
@@ -315,7 +302,8 @@ export async function planMultiBlock(
       jerk: allJrk,
       blockBoundaries,
     },
-    totalDuration: cumulativeTime,
-    totalDistance: cumulativePos,
+    totalDuration,
+    totalDistance,
+    mergedCount,
   };
 }

@@ -1,4 +1,5 @@
 #include "trajectory_constant_jerk.h"
+#include "constant-jerk-planner.h"
 #include <stdio.h>
 #include <math.h>
 
@@ -97,12 +98,195 @@ void test_moving_to_rest() {
   check("vel(end)",    traj.getVelocityAtTime(dur), 0);
 }
 
+// ============================================================
+// Multi-block planner + merging tests
+// ============================================================
+
+// Helper: push N identical blocks
+static void push_identical(int n, float mm, float max_entry, float nominal, float a_max, float j_max) {
+  for (int i = 0; i < n; i++)
+    cjp_push_block(mm, max_entry, nominal, a_max, j_max);
+}
+
+// 11 identical blocks with high maxEntrySpeed -> should merge into 1
+void test_merge_identical_blocks() {
+  printf("test_merge_identical_blocks\n");
+  cjp_reset();
+  push_identical(11, 5, 10000000, 200, 5000, 30000);
+  cjp_recalculate();
+
+  check("merged_size", (float)cjp_merged_size(), 1.0f);
+
+  CJP_BlockOut mb;
+  cjp_get_merged_block(0, &mb);
+  check("merged_mm", mb.millimeters, 55.0f);
+  check("merged_entry_v", mb.entry_v, 0.0f);
+  check("merged_exit_v", mb.exit_v, 0.0f);
+}
+
+// Blocks with different constraints -> no merging
+void test_no_merge_different_constraints() {
+  printf("test_no_merge_different_constraints\n");
+  cjp_reset();
+  cjp_push_block(5, 10000, 200, 5000, 30000);
+  cjp_push_block(5, 10000, 200, 6000, 30000);  // different a_max
+  cjp_push_block(5, 10000, 200, 5000, 30000);
+  cjp_recalculate();
+
+  check("merged_size", (float)cjp_merged_size(), 3.0f);
+}
+
+// Same constraints, low maxEntrySpeed at one junction -> split there
+void test_merge_split_at_low_junction() {
+  printf("test_merge_split_at_low_junction\n");
+  cjp_reset();
+  // 5 blocks, same constraints, but block 3 has very low maxEntrySpeed
+  cjp_push_block(10, 10000000, 200, 5000, 30000);
+  cjp_push_block(10, 10000000, 200, 5000, 30000);
+  cjp_push_block(10, 1, 200, 5000, 30000);        // very low max entry -> forces split
+  cjp_push_block(10, 10000000, 200, 5000, 30000);
+  cjp_push_block(10, 10000000, 200, 5000, 30000);
+  cjp_recalculate();
+
+  // Should split at block 2 (maxEntrySpeed=1), resulting in at least 2 merged groups
+  check("merged_size>=2", cjp_merged_size() >= 2 ? 1.0f : 0.0f, 1.0f);
+  printf("  merged_count = %zu\n", cjp_merged_size());
+}
+
+// Low maxEntrySpeed near start where velocity is still low -> should NOT split
+void test_no_split_near_start() {
+  printf("test_no_split_near_start\n");
+  cjp_reset();
+  // 5 blocks, 5mm each. Block 1 has maxEntrySpeed=100.
+  // From rest, after 5mm the max reachable speed is ~90, below 100, so no split.
+  cjp_push_block(5, 10000000, 200, 5000, 30000);
+  cjp_push_block(5, 100, 200, 5000, 30000);         // max_entry=100 > ~90 reachable from rest over 5mm
+  cjp_push_block(5, 10000000, 200, 5000, 30000);
+  cjp_push_block(5, 10000000, 200, 5000, 30000);
+  cjp_push_block(5, 10000000, 200, 5000, 30000);
+  cjp_recalculate();
+
+  printf("  merged_count = %zu\n", cjp_merged_size());
+  check("merged_size", (float)cjp_merged_size(), 1.0f);
+}
+
+// Merged duration should be less than individually planned blocks
+void test_merged_faster_than_individual() {
+  printf("test_merged_faster_than_individual\n");
+
+  // Plan as merged (11 identical blocks)
+  cjp_reset();
+  push_identical(11, 5, 10000000, 200, 5000, 30000);
+  cjp_recalculate();
+
+  // Get merged trajectory duration
+  CJP_BlockOut mb;
+  cjp_get_merged_block(0, &mb);
+  ConstantJerkTrajectoryGenerator traj;
+  traj.plan(mb.entry_v, mb.exit_v, mb.a_max, mb.j_max, mb.millimeters, mb.nominal);
+  float merged_dur = traj.getTotalDuration();
+
+  // Plan as individual blocks (no merging possible - fake different constraints)
+  float individual_dur = 0;
+  for (int i = 0; i < 11; i++) {
+    float entry = (i == 0) ? 0.0f : 0.0f;  // each block 0->0 individually is worst case
+    float exit = 0.0f;
+    traj.plan(entry, exit, 5000, 30000, 5, 200);
+    individual_dur += traj.getTotalDuration();
+  }
+
+  printf("  merged_dur=%.4f, individual_dur=%.4f\n", merged_dur, individual_dur);
+  check("merged<individual", merged_dur < individual_dur ? 1.0f : 0.0f, 1.0f);
+}
+
+// Exec streaming: step through, verify original block transitions
+void test_exec_streaming() {
+  printf("test_exec_streaming\n");
+  cjp_reset();
+  // 3 blocks that will merge into 1
+  cjp_push_block(10, 10000000, 200, 5000, 30000);
+  cjp_push_block(10, 10000000, 200, 5000, 30000);
+  cjp_push_block(10, 10000000, 200, 5000, 30000);
+  cjp_recalculate();
+
+  check("merged_size", (float)cjp_merged_size(), 1.0f);
+
+  cjp_exec_reset();
+
+  float dt = 0.0001f;
+  size_t last_orig = 0;
+  int transitions = 0;
+  float last_pos = 0;
+  int steps = 0;
+
+  while (cjp_exec_step(dt)) {
+    steps++;
+    size_t orig = cjp_exec_original_block();
+    float pos = cjp_exec_position();
+
+    if (orig != last_orig) {
+      printf("  transition to block %zu at pos=%.3f\n", orig, pos);
+      transitions++;
+      last_orig = orig;
+    }
+    last_pos = pos;
+
+    // Safety: don't loop forever
+    if (steps > 10000000) break;
+  }
+
+  check("steps>0", steps > 0 ? 1.0f : 0.0f, 1.0f);
+  check("transitions", (float)transitions, 2.0f);  // 0->1 and 1->2
+  check("final_pos", last_pos, 30.0f, 0.5f);  // total 30mm
+  printf("  steps=%d, final_pos=%.3f\n", steps, last_pos);
+}
+
+// Exec streaming: blocks that don't merge (different constraints)
+void test_exec_no_merge() {
+  printf("test_exec_no_merge\n");
+  cjp_reset();
+  cjp_push_block(10, 10000, 200, 5000, 30000);
+  cjp_push_block(10, 10000, 100, 5000, 30000);  // different nominal
+  cjp_push_block(10, 10000, 200, 5000, 30000);
+  cjp_recalculate();
+
+  check("merged_size", (float)cjp_merged_size(), 3.0f);
+
+  cjp_exec_reset();
+
+  float dt = 0.0001f;
+  size_t last_merged = 0;
+  int merged_transitions = 0;
+  int steps = 0;
+
+  while (cjp_exec_step(dt)) {
+    steps++;
+    size_t mi = cjp_exec_merged_block();
+    if (mi != last_merged) {
+      merged_transitions++;
+      last_merged = mi;
+    }
+    if (steps > 10000000) break;
+  }
+
+  check("steps>0", steps > 0 ? 1.0f : 0.0f, 1.0f);
+  check("merged_transitions", (float)merged_transitions, 2.0f);
+}
+
 int main() {
   test_pure_cruise();
   test_rest_to_rest_with_cruise();
   test_rest_to_rest_no_cruise();
   test_rest_to_moving();
   test_moving_to_rest();
+
+  test_merge_identical_blocks();
+  test_no_merge_different_constraints();
+  test_merge_split_at_low_junction();
+  test_no_split_near_start();
+  test_merged_faster_than_individual();
+  test_exec_streaming();
+  test_exec_no_merge();
 
   printf("\n%d passed, %d failed\n", tests_passed, tests_failed);
   return tests_failed > 0 ? 1 : 0;

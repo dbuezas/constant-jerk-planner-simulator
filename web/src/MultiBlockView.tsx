@@ -207,8 +207,8 @@ export default function MultiBlockView() {
             </span>
             Blocks
             <span className="ml-auto text-xs text-[#666]">
-              {result.blocks.length} blocks &middot;{" "}
-              {format(result.totalDuration)} s &middot;{" "}
+              {result.blocks.length} blocks &rarr; {result.mergedCount} merged
+              &middot; {format(result.totalDuration)} s &middot;{" "}
               {format(result.totalDistance, 2)} mm
             </span>
           </button>
