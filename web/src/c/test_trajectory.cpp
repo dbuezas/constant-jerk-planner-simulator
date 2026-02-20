@@ -273,6 +273,39 @@ void test_exec_no_merge() {
   check("merged_transitions", (float)merged_transitions, 2.0f);
 }
 
+// Blocks with slightly different a_max (within 10% ratio) should merge
+void test_merge_similar_amax() {
+  printf("test_merge_similar_amax\n");
+  cjp_reset();
+  // a_max values: 5000, 5200, 4800 — max/min = 5200/4800 = 1.083 < 1.1
+  cjp_push_block(10, 10000000, 200, 5000, 30000);
+  cjp_push_block(10, 10000000, 200, 5200, 30000);
+  cjp_push_block(10, 10000000, 200, 4800, 30000);
+  cjp_recalculate();
+
+  printf("  merged_count = %zu\n", cjp_merged_size());
+  check("merged_size", (float)cjp_merged_size(), 1.0f);
+
+  // Merged block should use min(a_max) = 4800
+  CJP_BlockOut mb;
+  cjp_get_merged_block(0, &mb);
+  check("merged_a_max", mb.a_max, 4800.0f);
+}
+
+// Blocks with very different a_max (>10% ratio) should NOT merge
+void test_no_merge_far_amax() {
+  printf("test_no_merge_far_amax\n");
+  cjp_reset();
+  // a_max values: 5000, 5000, 2000 — ratio 5000/2000 = 2.5 > 1.1
+  cjp_push_block(10, 10000000, 200, 5000, 30000);
+  cjp_push_block(10, 10000000, 200, 5000, 30000);
+  cjp_push_block(10, 10000000, 200, 2000, 30000);  // very different
+  cjp_recalculate();
+
+  printf("  merged_count = %zu\n", cjp_merged_size());
+  check("merged_size", (float)cjp_merged_size(), 2.0f);  // first two merge, third is separate
+}
+
 int main() {
   test_pure_cruise();
   test_rest_to_rest_with_cruise();
@@ -287,6 +320,8 @@ int main() {
   test_merged_faster_than_individual();
   test_exec_streaming();
   test_exec_no_merge();
+  test_merge_similar_amax();
+  test_no_merge_far_amax();
 
   printf("\n%d passed, %d failed\n", tests_passed, tests_failed);
   return tests_failed > 0 ? 1 : 0;

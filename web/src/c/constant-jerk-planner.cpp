@@ -119,8 +119,18 @@ static float max_reachable_speed(float v_from, float mm,
   return lo;
 }
 
-static bool constraints_match(const Block& a, const Block& b) {
-  return a.nominal == b.nominal && a.a_max == b.a_max && a.j_max == b.j_max;
+#define CJP_MERGE_AMAX_RATIO 1.1f  // max/min a_max ratio allowed for merging
+
+// Check if a candidate block can merge into a group with the given constraints.
+// nominal and j_max must match exactly; a_max must be within ratio threshold
+// of the group's current min/max a_max range.
+static bool can_merge(const Block& candidate, float group_nominal, float group_j_max,
+                      float group_a_max_min, float group_a_max_max) {
+  if (candidate.nominal != group_nominal || candidate.j_max != group_j_max)
+    return false;
+  float new_min = fminf(group_a_max_min, candidate.a_max);
+  float new_max = fmaxf(group_a_max_max, candidate.a_max);
+  return new_max <= new_min * CJP_MERGE_AMAX_RATIO;
 }
 
 // Build merged groups from original blocks
@@ -143,18 +153,28 @@ static void build_merged_groups(Planner& p) {
     m.entry_v = 0;
     m.exit_v = 0;
 
+    float a_max_min = first->a_max;
+    float a_max_max = first->a_max;
+
     float cum_dist = first->millimeters;
     size_t j = i + 1;
-    while (j < p.count && constraints_match(*first, *p.at(j))) {
+    while (j < p.count && can_merge(*p.at(j), m.nominal, m.j_max, a_max_min, a_max_max)) {
+      const Block* blk = p.at(j);
+
+      a_max_min = fminf(a_max_min, blk->a_max);
+      a_max_max = fmaxf(a_max_max, blk->a_max);
+
       // Record interior junction constraint
       m.junctions[m.junction_count].cumulative_dist = cum_dist;
-      m.junctions[m.junction_count].max_speed = p.at(j)->max_entry_speed;
+      m.junctions[m.junction_count].max_speed = blk->max_entry_speed;
       m.junction_count++;
 
-      cum_dist += p.at(j)->millimeters;
+      cum_dist += blk->millimeters;
       m.orig_count++;
       j++;
     }
+    // Use the most conservative a_max in the group
+    m.a_max = a_max_min;
     m.millimeters = cum_dist;
     p.merged_count++;
     i = j;
