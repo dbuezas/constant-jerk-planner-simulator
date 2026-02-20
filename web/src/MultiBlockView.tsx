@@ -18,33 +18,11 @@ const PLOT_THEME = {
   font: { color: "#e6e6e6" },
 };
 
-const DEFAULT_BLOCKS_JSON = JSON.stringify(
-  [
-    {
-      millimeters: 5,
-      maxEntrySpeed: 10,
-      nominal: 200,
-      aMax: 5000,
-      jMax: 30000,
-    },
-    {
-      millimeters: 5,
-      maxEntrySpeed: 10,
-      nominal: 200,
-      aMax: 5000,
-      jMax: 30000,
-    },
-    {
-      millimeters: 5,
-      maxEntrySpeed: 10,
-      nominal: 200,
-      aMax: 5000,
-      jMax: 30000,
-    },
-  ],
-  null,
-  2
-);
+const DEFAULT_BLOCKS_JSON = `[
+  { millimeters: 5, maxEntrySpeed: 10, nominal: 200, aMax: 5000, jMax: 30000 },
+  { millimeters: 5, maxEntrySpeed: 10, nominal: 200, aMax: 5000, jMax: 30000 },
+  { millimeters: 5, maxEntrySpeed: 10, nominal: 200, aMax: 5000, jMax: 30000 },
+]`;
 
 export default function MultiBlockView() {
   const [blocksJson, setBlocksJson] = useState(DEFAULT_BLOCKS_JSON);
@@ -68,7 +46,11 @@ export default function MultiBlockView() {
   const runMultiBlock = useCallback(async () => {
     setError(null);
     try {
-      const blocks = JSON.parse(blocksJson) as BlockDefinition[];
+      // const blocks = JSON.parse(blocksJson) as BlockDefinition[];
+      const blocks = Function(
+        '"use strict"; return (' + blocksJson + ")"
+      )() as BlockDefinition[];
+
       for (const b of blocks) {
         if (b.millimeters <= 0 || b.nominal <= 0 || b.aMax <= 0 || b.jMax <= 0)
           throw new Error("All block parameters must be positive");
@@ -173,8 +155,8 @@ export default function MultiBlockView() {
             </label>
             <div className="overflow-hidden rounded-md border border-[#333]">
               <Editor
-                height="300px"
-                defaultLanguage="json"
+                height="200px"
+                defaultLanguage="javascript"
                 value={blocksJson}
                 onChange={(v) => setBlocksJson(v ?? "")}
                 theme="vs-dark"
@@ -196,7 +178,7 @@ export default function MultiBlockView() {
 
         {result && (
           <>
-            <div className="mt-4 overflow-x-auto">
+            <div className="mt-4 overflow-x-auto max-h-40">
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="border-b border-[#333] text-[#9aa3b2]">

@@ -56,7 +56,7 @@ static inline void simulatePhase(float jerk, float dt, float& v, float& a, float
 
 // Plan a 3-phase ramp between v_start and v_peak.
 // Returns the distance consumed.
-// pa = jerk phase (ramp accel up/down), pb = cruise-accel phase, pc = jerk phase (ramp accel back to 0).
+// Output durations: pa = jerk phase, pb = constant-accel phase, pc = returning-jerk phase.
 // Accel (decel=false): [+j, 0, -j] from v_start to v_peak.
 // Decel (decel=true):  [-j, 0, +j] from v_peak to v_start.
 static inline float planRamp(float v_start, float v_peak, float j, float a_max,
