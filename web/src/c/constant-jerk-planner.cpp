@@ -59,27 +59,28 @@ struct Planner {
 
 // Returns the maximum speed reachable at the other end of a block,
 // starting from v_from with a=0, ending with a=0.
-// Uses ConstantJerkTrajectoryGenerator as a feasibility oracle.
+// The minimum distance to go between v_from and v_other (with v_peak = max of the two)
+// is just a single ramp from min to max. Binary search finds the highest v_other
+// whose ramp distance fits within mm.
 static float max_reachable_speed(float v_from, float mm,
                                  float nominal, float a_max, float j_max) {
   if (mm <= 0.0f) return v_from;
 
-  ConstantJerkTrajectoryGenerator traj;
-
   // Trapezoidal upper bound (ignoring jerk limits)
   float v_trap = sqrtf(v_from * v_from + 2.0f * a_max * mm);
   float hi = fminf(nominal, v_trap);
-  float lo = 0.0f;
+  float lo = v_from;
 
   // Quick check: can we reach hi?
-  traj.plan(v_from, hi, a_max, j_max, mm, nominal);
-  if (traj.getTotalDuration() > 0) return hi;
+  float pa, pb, pc;
+  float s = planRamp(v_from, hi, j_max, a_max, false, pa, pb, pc);
+  if (s <= mm) return hi;
 
   // Binary search for max feasible exit speed
   for (int i = 0; i < 32; i++) {
     float mid = 0.5f * (lo + hi);
-    traj.plan(v_from, mid, a_max, j_max, mm, nominal);
-    if (traj.getTotalDuration() > 0)
+    s = planRamp(v_from, mid, j_max, a_max, false, pa, pb, pc);
+    if (s <= mm)
       lo = mid;
     else
       hi = mid;
