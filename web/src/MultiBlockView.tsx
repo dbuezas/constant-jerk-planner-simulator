@@ -30,6 +30,8 @@ export default function MultiBlockView() {
   const [error, setError] = useState<string | null>(null);
   const [dt] = useState(0.0005);
   const plotRef = useRef<HTMLDivElement | null>(null);
+  const [editorOpen, setEditorOpen] = useState(true);
+  const [tableOpen, setTableOpen] = useState(true);
 
   const [plotHeight, setPlotHeight] = useState(600);
 
@@ -147,12 +149,24 @@ export default function MultiBlockView() {
   }, [blocksJson, runMultiBlock]);
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-6">
-      <section className="rounded-xl border border-[#333] bg-[#1d1d1d] px-5 py-4">
-        <div className="flex gap-4">
-          <div className="flex-1">
-            <label className="mb-1 block text-sm text-[#b8b8b8]">
-              Block definitions (JSON)
-            </label>
+      <section className="rounded-xl border border-[#333] bg-[#1d1d1d]">
+        <button
+          type="button"
+          className="flex w-full items-center gap-2 px-5 py-3 text-sm text-[#b8b8b8] hover:text-white"
+          onClick={() => setEditorOpen((o) => !o)}
+        >
+          <span
+            className="inline-block transition-transform"
+            style={{
+              transform: editorOpen ? "rotate(90deg)" : "rotate(0deg)",
+            }}
+          >
+            &#9654;
+          </span>
+          Block definitions
+        </button>
+        {editorOpen && (
+          <div className="px-5 pb-4">
             <div className="overflow-hidden rounded-md border border-[#333]">
               <Editor
                 height="200px"
@@ -171,56 +185,87 @@ export default function MultiBlockView() {
                 }}
               />
             </div>
+            {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
           </div>
-        </div>
-
-        {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
-
-        {result && (
-          <>
-            <div className="mt-4 overflow-x-auto max-h-40">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-[#333] text-[#9aa3b2]">
-                    <th className="px-2 py-1">#</th>
-                    <th className="px-2 py-1">mm</th>
-                    <th className="px-2 py-1">Nominal</th>
-                    <th className="px-2 py-1">a_max</th>
-                    <th className="px-2 py-1">j_max</th>
-                    <th className="px-2 py-1">Entry V</th>
-                    <th className="px-2 py-1">Exit V</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {result.blocks.map((b, i) => (
-                    <tr key={i} className="border-b border-[#222]">
-                      <td className="px-2 py-1 text-[#9aa3b2]">{i}</td>
-                      <td className="px-2 py-1">
-                        {format(b.input.millimeters, 2)}
-                      </td>
-                      <td className="px-2 py-1">
-                        {format(b.input.nominal, 2)}
-                      </td>
-                      <td className="px-2 py-1">{format(b.input.aMax, 2)}</td>
-                      <td className="px-2 py-1">{format(b.input.jMax, 2)}</td>
-                      <td className="px-2 py-1 text-orange-300">
-                        {format(b.entryV, 2)}
-                      </td>
-                      <td className="px-2 py-1 text-orange-300">
-                        {format(b.exitV, 2)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="mt-3 flex gap-6 text-sm text-[#b8b8b8]">
-              <span>Total duration: {format(result.totalDuration)} s</span>
-              <span>Total distance: {format(result.totalDistance, 2)} mm</span>
-            </div>
-          </>
         )}
       </section>
+
+      {result && (
+        <section className="rounded-xl border border-[#333] bg-[#1d1d1d]">
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 px-5 py-3 text-sm text-[#b8b8b8] hover:text-white"
+            onClick={() => setTableOpen((o) => !o)}
+          >
+            <span
+              className="inline-block transition-transform"
+              style={{
+                transform: tableOpen ? "rotate(90deg)" : "rotate(0deg)",
+              }}
+            >
+              &#9654;
+            </span>
+            Blocks
+            <span className="ml-auto text-xs text-[#666]">
+              {result.blocks.length} blocks &middot;{" "}
+              {format(result.totalDuration)} s &middot;{" "}
+              {format(result.totalDistance, 2)} mm
+            </span>
+          </button>
+          {tableOpen && (
+            <div className="px-5 pb-4">
+              <div className="overflow-x-auto max-h-40">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-[#333] text-[#9aa3b2]">
+                      <th className="px-2 py-1">#</th>
+                      <th className="px-2 py-1">mm</th>
+                      <th className="px-2 py-1">Nominal</th>
+                      <th className="px-2 py-1">a_max</th>
+                      <th className="px-2 py-1">j_max</th>
+                      <th className="px-2 py-1">Entry V</th>
+                      <th className="px-2 py-1">Exit V</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {result.blocks.map((b, i) => (
+                      <tr key={i} className="border-b border-[#222]">
+                        <td className="px-2 py-1 text-[#9aa3b2]">{i}</td>
+                        <td className="px-2 py-1">
+                          {format(b.input.millimeters, 2)}
+                        </td>
+                        <td className="px-2 py-1">
+                          {format(b.input.nominal, 2)}
+                        </td>
+                        <td className="px-2 py-1">
+                          {format(b.input.aMax, 2)}
+                        </td>
+                        <td className="px-2 py-1">
+                          {format(b.input.jMax, 2)}
+                        </td>
+                        <td className="px-2 py-1 text-orange-300">
+                          {format(b.entryV, 2)}
+                        </td>
+                        <td className="px-2 py-1 text-orange-300">
+                          {format(b.exitV, 2)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-3 flex gap-6 text-sm text-[#b8b8b8]">
+                <span>
+                  Total duration: {format(result.totalDuration)} s
+                </span>
+                <span>
+                  Total distance: {format(result.totalDistance, 2)} mm
+                </span>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
 
       <section className="flex min-h-0 flex-1 flex-col rounded-xl border border-[#333] bg-[#1d1d1d] px-5 py-4">
         <div ref={plotRef} className="min-h-0 flex-1" />
