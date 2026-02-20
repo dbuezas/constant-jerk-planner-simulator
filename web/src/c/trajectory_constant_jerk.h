@@ -59,7 +59,7 @@ static inline void simulatePhase(float jerk, float dt, float& v, float& a, float
 // Accel (decel=false): [+j, 0, -j] from v_start to v_peak.
 // Decel (decel=true):  [-j, 0, +j] from v_peak to v_start.
 static inline float planRamp(float v_start, float v_peak, float j, float a_max,
-                      bool decel, float& pa, float& pb, float& pc) {
+                             bool decel, float& pa, float& pb, float& pc) {
   float dv = v_peak - v_start;
   float a_peak_sq = j * dv;
   if (a_peak_sq < 0) {
@@ -115,45 +115,32 @@ class ConstantJerkTrajectoryGenerator {
     j = jerk_in;
     distance = distance_in;
 
-    if (distance <= 0.0f) {
-      CJP_SET_STATUS("distance <= 0");
-      return;
-    }
-    if (j <= 0.0f) {
-      CJP_SET_STATUS("j_max <= 0");
-      return;
-    }
-    if (a_max <= 0.0f) {
-      CJP_SET_STATUS("a_max <= 0");
-      return;
-    }
-
-    const float v_nominal = fmaxf(0.0f, v_nominal_in);
+    const float v_nominal = v_nominal_in;
 
     float v_small = fminf(v0, v1);
     float v_large = fmaxf(v0, v1);
 
     // Minimum feasible v_peak: must be >= both v0 and v1
-    float v_lo = fmaxf(0.0f, v_large);
+    float v_lo = v_large;
 
-    float v_peak = fmaxf(v_lo, v_nominal);
+    float v_peak = fmaxf(v_large, v_nominal);
     float s_ramps = totalRampDist(v_peak, v_small, v_large, j, a_max);
 
     if (s_ramps > distance) {
       // v_peak doesn't fit -- binary search until undershoot < tolerance
-      float hi = v_peak;
+      float v_hi = v_peak;
       if (totalRampDist(v_lo, v_small, v_large, j, a_max) > distance) {
         CJP_SET_STATUS("minimum ramp distance exceeds block distance");
         return;
       }
       for (int i = 0; i < 48; i++) {
-        float mid = 0.5f * (v_lo + hi);
+        float mid = 0.5f * (v_lo + v_hi);
         float s_mid = totalRampDist(mid, v_small, v_large, j, a_max);
         if (s_mid > distance)
-          hi = mid;
+          v_hi = mid;
         else
           v_lo = mid;
-        if (distance - s_mid >= 0 && distance - s_mid < 0.01f) break;
+        if (distance - s_mid >= 0 && distance - s_mid < 0.1f) break;
       }
       v_peak = v_lo;
     }
