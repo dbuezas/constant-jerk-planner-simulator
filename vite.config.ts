@@ -30,6 +30,7 @@ function wasmPlugin() {
   return {
     name: 'planner-wasm-rebuild',
     async buildStart() {
+      if (process.env.SKIP_WASM_BUILD) return
       try {
         await buildWasm()
       } catch (err) {
@@ -54,6 +55,7 @@ function wasmPlugin() {
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: process.env.GITHUB_ACTIONS ? '/constant-jerk-planner-simulator/' : '/',
   plugins: [
     react({
       babel: {

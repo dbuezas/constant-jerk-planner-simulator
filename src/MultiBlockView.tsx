@@ -19,9 +19,13 @@ const PLOT_THEME = {
 };
 
 const DEFAULT_BLOCKS_JSON = `[
-  { millimeters: 5, maxEntrySpeed: 10, nominal: 200, aMax: 5000, jMax: 30000 },
-  { millimeters: 5, maxEntrySpeed: 10, nominal: 200, aMax: 5000, jMax: 30000 },
-  { millimeters: 5, maxEntrySpeed: 10, nominal: 200, aMax: 5000, jMax: 30000 },
+  { millimeters: 1, maxEntrySpeed: 100, nominal: 200, aMax: 5000, jMax: 30000 },
+  { millimeters: 1, maxEntrySpeed: 100, nominal: 200, aMax: 5000, jMax: 30000 },
+  { millimeters: 1, maxEntrySpeed: 100, nominal: 200, aMax: 5000, jMax: 30000 },
+  { millimeters: 1, maxEntrySpeed: 10, nominal: 200, aMax: 5000, jMax: 30000 },
+  { millimeters: 1, maxEntrySpeed: 100, nominal: 200, aMax: 5000, jMax: 30000 },
+  { millimeters: 1, maxEntrySpeed: 100, nominal: 200, aMax: 5000, jMax: 30000 },
+  { millimeters: 1, maxEntrySpeed: 100, nominal: 200, aMax: 5000, jMax: 30000 },
 ]`;
 
 export default function MultiBlockView() {
@@ -237,12 +241,8 @@ export default function MultiBlockView() {
                         <td className="px-2 py-1">
                           {format(b.input.nominal, 2)}
                         </td>
-                        <td className="px-2 py-1">
-                          {format(b.input.aMax, 2)}
-                        </td>
-                        <td className="px-2 py-1">
-                          {format(b.input.jMax, 2)}
-                        </td>
+                        <td className="px-2 py-1">{format(b.input.aMax, 2)}</td>
+                        <td className="px-2 py-1">{format(b.input.jMax, 2)}</td>
                         <td className="px-2 py-1 text-orange-300">
                           {format(b.entryV, 2)}
                         </td>
@@ -255,9 +255,7 @@ export default function MultiBlockView() {
                 </table>
               </div>
               <div className="mt-3 flex gap-6 text-sm text-[#b8b8b8]">
-                <span>
-                  Total duration: {format(result.totalDuration)} s
-                </span>
+                <span>Total duration: {format(result.totalDuration)} s</span>
                 <span>
                   Total distance: {format(result.totalDistance, 2)} mm
                 </span>
