@@ -1,11 +1,10 @@
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { spawn } from 'node:child_process'
 import path from 'node:path'
 
 const wasmRoot = path.resolve(__dirname, 'src', 'wasm')
 const wasmScript = path.join(wasmRoot, 'build-wasm.sh')
-const wasmOut = path.join(wasmRoot, 'planner_wasm.js')
 
 function buildWasm() {
   return new Promise<void>((resolve, reject) => {
@@ -17,7 +16,7 @@ function buildWasm() {
   })
 }
 
-function wasmPlugin() {
+function wasmPlugin(): Plugin {
   const watchedFiles = [
     wasmScript,
     path.join(wasmRoot, 'planner_wrapper.cpp'),
@@ -37,7 +36,7 @@ function wasmPlugin() {
         this.error((err as Error).message)
       }
     },
-    configureServer(server: { watcher: { add: (paths: string[]) => void }; ws: { send: (payload: { type: string }) => void } }) {
+    configureServer(server) {
       server.watcher.add(watchedFiles)
       server.watcher.on('change', async (file: string) => {
         if (!watchedFiles.includes(file)) return
