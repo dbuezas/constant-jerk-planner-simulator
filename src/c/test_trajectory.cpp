@@ -310,6 +310,54 @@ void test_no_merge_far_amax() {
   check("merged_size", (float)cjp_merged_size(), 2.0f);  // first two merge, third is separate
 }
 
+// Debug: reproduce velocity discontinuity between merged blocks
+void test_velocity_continuity_bug() {
+  printf("test_velocity_continuity_bug\n");
+  cjp_reset();
+  float blocks[][5] = {
+    {4, 400, 500, 100000, 1000000},
+    {4, 400, 500, 100000, 1000000},
+    {1, 400, 500, 100000, 1000000},
+    {2, 400, 500, 100000, 1000000},
+    {4, 400, 500, 100000, 1000000},
+    {2, 400, 500, 100000, 1000000},
+    {1, 400, 500, 100000, 1000000},
+    {4, 400, 500, 100000, 1000000},
+  };
+  for (auto& b : blocks)
+    cjp_push_block(b[0], b[1], b[2], b[3], b[4]);
+  cjp_recalculate();
+
+  printf("  merged_count = %zu\n", cjp_merged_size());
+  for (size_t i = 0; i < cjp_merged_size(); i++) {
+    CJP_BlockOut mb;
+    cjp_get_merged_block(i, &mb);
+    printf("  merged[%zu]: mm=%.1f entry=%.3f exit=%.3f orig_start=? orig_count=?\n",
+           i, mb.millimeters, mb.entry_v, mb.exit_v);
+  }
+  for (size_t i = 0; i < cjp_size(); i++) {
+    CJP_BlockOut ob;
+    cjp_get_block(i, &ob);
+    printf("  block[%zu]: mm=%.1f entry=%.3f exit=%.3f\n",
+           i, ob.millimeters, ob.entry_v, ob.exit_v);
+  }
+
+  // Check velocity continuity at merged block boundaries
+  bool has_discontinuity = false;
+  for (size_t i = 0; i + 1 < cjp_merged_size(); i++) {
+    CJP_BlockOut a, b;
+    cjp_get_merged_block(i, &a);
+    cjp_get_merged_block(i + 1, &b);
+    float gap = fabsf(a.exit_v - b.entry_v);
+    if (gap > 0.1f) {
+      printf("  DISCONTINUITY between merged[%zu] and merged[%zu]: exit=%.3f entry=%.3f gap=%.3f\n",
+             i, i + 1, a.exit_v, b.entry_v, gap);
+      has_discontinuity = true;
+    }
+  }
+  check("no_velocity_discontinuity", has_discontinuity ? 0.0f : 1.0f, 1.0f);
+}
+
 int main() {
   test_pure_cruise();
   test_rest_to_rest_with_cruise();
@@ -326,6 +374,7 @@ int main() {
   test_exec_no_merge();
   test_merge_similar_amax();
   test_no_merge_far_amax();
+  test_velocity_continuity_bug();
 
   printf("\n%d passed, %d failed\n", tests_passed, tests_failed);
   return tests_failed > 0 ? 1 : 0;

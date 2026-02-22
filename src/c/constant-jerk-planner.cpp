@@ -335,6 +335,9 @@ static void recalculate(Planner& p) {
             merge_count = left_end;
             entry_v[pos] = left_entry;
             exit_v[pos + left_end - 1] = left_exit;
+            // Propagate to the next group so boundary speed matches
+            if (pos + left_end < n)
+              entry_v[pos + left_end] = fminf(entry_v[pos + left_end], left_exit);
             break;
           }
           else {
@@ -349,6 +352,13 @@ static void recalculate(Planner& p) {
     }
 
     // Emit the merged block (merge_count >= 1)
+    // Cap exit_v: the merge algorithm may have used a right superblock to
+    // compute a higher exit speed, but the blocks after us may not merge as
+    // a superblock. The per-block pass entry_v is the guaranteed safe limit.
+    float emit_exit = exit_v[pos + merge_count - 1];
+    if (pos + merge_count < n)
+      emit_exit = fminf(emit_exit, entry_v[pos + merge_count]);
+
     MergedBlock& m = p.merged[p.merged_count++];
     m.millimeters = sum_dist(mm + pos, merge_count);
     m.nominal = nominal[pos];
@@ -356,7 +366,7 @@ static void recalculate(Planner& p) {
     m.j_max = j_max;
     m.max_entry_speed = max_junction_v[pos];
     m.entry_v = entry_v[pos];
-    m.exit_v = exit_v[pos + merge_count - 1];
+    m.exit_v = emit_exit;
     m.orig_start = pos;
     m.orig_count = merge_count;
 
