@@ -2,6 +2,8 @@
 
 Made to develop and debug the code before implementing it in marlin.
 
+Here's the marlin PR https://github.com/MarlinFirmware/Marlin/pull/28349
+
 ## Play with it here: https://dbuezas.github.io/constant-jerk-planner-simulator/
 
 <img width="400"  alt="image" src="https://github.com/user-attachments/assets/6c78a66a-64df-4456-875e-342ebbce6a47" />
